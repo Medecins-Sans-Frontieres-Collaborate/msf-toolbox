@@ -1,0 +1,291 @@
+name: Publish to PyPI
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  validate-version:
+    name: Validate Version
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0  # Full history for setuptools_scm
+    
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.10'
+    
+    - name: Install setuptools_scm
+      run: |
+        python -m pip install --upgrade pip
+        pip install setuptools_scm packaging
+    
+    - name: Check version matches tag
+      id: version
+      run: |
+        # Get version from setuptools_scm
+        SCM_VERSION=$(python -c "from setuptools_scm import get_version; print(get_version())")
+        # Get tag from GitHub ref, handling both with and without 'v' prefix
+        FULL_TAG=${GITHUB_REF#refs/tags/}
+        # Remove 'v' prefix if present to get clean version
+        TAG=${FULL_TAG#v}
+        
+        echo "Full tag: $FULL_TAG"
+        echo "Clean version: $TAG"
+        
+        python scripts/validate_version.py "$SCM_VERSION" "$TAG"
+        
+        if [ $? -ne 0 ]; then
+          echo "Version validation failed!"
+          exit 1
+        fi
+        
+        # Output the clean version (without 'v' prefix)
+        echo "version=$TAG" >> $GITHUB_OUTPUT
+
+  build:
+    name: Build distribution
+    needs: validate-version
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0  # Full history for setuptools_scm
+    
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.10'
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        python -m pip install -U build
+    
+    - name: Build package
+      run: python -m build
+    
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: python-package-distributions
+        path: dist/
+
+  publish-to-testpypi:
+    name: Publish to TestPyPI
+    needs: build
+    runs-on: ubuntu-latest
+    environment: testpypi
+    permissions:
+      id-token: write
+    
+    steps:
+    - name: Download artifacts
+      uses: actions/download-artifact@v4
+      with:
+        name: python-package-distributions
+        path: dist/
+    
+    - name: Publish to TestPyPI
+      uses: pypa/gh-action-pypi-publish@release/v1
+      with:
+        repository-url: https://test.pypi.org/legacy/
+
+  test-testpypi-install:
+    name: Test TestPyPI Installation
+    needs: [validate-version, publish-to-testpypi]
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ['3.10', '3.11', '3.12']
+    
+    steps:
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ matrix.python-version }}
+    
+    - name: Wait for TestPyPI availability
+      run: |
+        echo "Waiting for package to be available on TestPyPI..."
+        for i in {1..5}; do
+          echo "Attempt $i of 5..."
+          if pip index versions --index-url https://test.pypi.org/simple/ msftoolbox 2>/dev/null | grep -q "${{ needs.validate-version.outputs.version }}"; then
+            echo "Package msftoolbox==${{ needs.validate-version.outputs.version }} is available on TestPyPI!"
+            break
+          else
+            if [ $i -eq 5 ]; then
+              echo "Package not available after 5 attempts"
+              exit 1
+            fi
+            echo "Package not yet available, waiting 60 seconds..."
+            sleep 60
+          fi
+        done
+    
+    - name: Test installation from TestPyPI
+      run: |
+        python -m pip install --upgrade pip
+        pip install --index-url https://test.pypi.org/simple/ \
+                    --extra-index-url https://pypi.org/simple/ \
+                    msftoolbox==${{ needs.validate-version.outputs.version }}
+    
+    - name: Test imports
+      run: |
+        python -c "
+        import msftoolbox
+        print(f'Successfully imported msftoolbox')
+        
+        # Test basic imports
+        from msftoolbox.azure.azure_keyvault import AzureKeyvaultClient
+        from msftoolbox.sharepoint.files import SharePointFileClient
+        from msftoolbox.dhis2.data import Dhis2DataValuesClient
+        print('All basic imports successful')
+        "
+
+  publish-to-pypi:
+    name: Publish to PyPI
+    needs: [build, test-testpypi-install]  # Only publish if TestPyPI tests pass
+    runs-on: ubuntu-latest
+    environment: pypi
+    permissions:
+      id-token: write
+    
+    steps:
+    - name: Download artifacts
+      uses: actions/download-artifact@v4
+      with:
+        name: python-package-distributions
+        path: dist/
+    
+    - name: Publish to PyPI
+      uses: pypa/gh-action-pypi-publish@release/v1
+
+  test-pypi-install:
+    name: Test PyPI Installation
+    needs: [validate-version, publish-to-pypi]
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.10'
+    
+    - name: Wait for PyPI availability
+      run: |
+        echo "Waiting for package to be available on PyPI..."
+        for i in {1..5}; do
+          echo "Attempt $i of 5..."
+          if pip index versions msftoolbox 2>/dev/null | grep -q "${{ needs.validate-version.outputs.version }}"; then
+            echo "Package msftoolbox==${{ needs.validate-version.outputs.version }} is available on PyPI!"
+            break
+          else
+            if [ $i -eq 5 ]; then
+              echo "Package not available after 5 attempts"
+              exit 1
+            fi
+            echo "Package not yet available, waiting 60 seconds..."
+            sleep 60
+          fi
+        done
+    
+    - name: Test installation from PyPI
+      run: |
+        python -m pip install --upgrade pip
+        pip install msftoolbox==${{ needs.validate-version.outputs.version }}
+    
+    - name: Test imports
+      run: |
+        python -c "
+        import msftoolbox
+        print(f'Successfully imported msftoolbox')
+        
+        # Test basic imports
+        from msftoolbox.azure.azure_keyvault import AzureKeyvaultClient
+        from msftoolbox.sharepoint.files import SharePointFileClient
+        from msftoolbox.dhis2.data import Dhis2DataValuesClient
+        print('All basic imports successful')
+        "
+
+  generate-changelog:
+    name: Update Release Notes
+    needs: [publish-to-pypi, test-pypi-install]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+    
+    - name: Generate changelog
+      id: changelog
+      run: |
+        # Function to extract PR title from merge commit message
+        # Handles various branch name formats and special characters
+        extract_pr_title() {
+          local commit_msg="$1"
+          # Match "Merge pull request #123 from owner/branch-name " and extract everything after
+          # The branch pattern handles: letters, numbers, -, _, ., / and other allowed GitHub branch chars
+          local pr_title=$(echo "$commit_msg" | sed -E 's/^Merge pull request #[0-9]+ from [^[:space:]]+ //')
+          
+          # Validate that we actually extracted something meaningful
+          if [ -n "$pr_title" ] && [ "$pr_title" != "$commit_msg" ]; then
+            echo "$pr_title"
+            return 0
+          else
+            return 1
+          fi
+        }
+        
+        # Get current and previous tags
+        CURRENT_TAG=${GITHUB_REF#refs/tags/}
+        PREVIOUS_TAG=$(git describe --tags --abbrev=0 $CURRENT_TAG^ 2>/dev/null || echo "")
+        
+        echo "Current tag: $CURRENT_TAG"
+        echo "Previous tag: $PREVIOUS_TAG"
+        
+        # Generate changelog content
+        echo "## What's Changed" > changelog.md
+        echo "" >> changelog.md
+        
+        if [ -z "$PREVIOUS_TAG" ]; then
+          # First release
+          echo "Initial release of MSF Toolbox" >> changelog.md
+        else
+          # Get commit messages between tags - store output first to avoid subshell issues
+          MERGE_COMMITS=$(git log ${PREVIOUS_TAG}..${CURRENT_TAG} --pretty=format:"%s" | grep -E "^Merge pull request #[0-9]+")
+          while IFS= read -r line; do
+            if [ -n "$line" ]; then
+              if PR_TITLE=$(extract_pr_title "$line"); then
+                echo "- $PR_TITLE" >> changelog.md
+              fi
+            fi
+          done <<< "$MERGE_COMMITS"
+        fi
+        
+        echo "" >> changelog.md
+        echo "### Installation" >> changelog.md
+        echo '```bash' >> changelog.md
+        echo "pip install msftoolbox==${CURRENT_TAG#v}" >> changelog.md
+        echo '```' >> changelog.md
+        echo "" >> changelog.md
+        
+        if [ ! -z "$PREVIOUS_TAG" ]; then
+          echo "**Full Changelog**: https://github.com/${{ github.repository }}/compare/${PREVIOUS_TAG}...${CURRENT_TAG}" >> changelog.md
+        fi
+    
+    - name: Update release
+      uses: softprops/action-gh-release@v2
+      with:
+        body_path: changelog.md
+        append_body: true
