@@ -1,11 +1,41 @@
+import os
 from typing import TYPE_CHECKING
 
+from azure.keyvault.certificates._models import KeyVaultCertificate
 from azure.keyvault.secrets import SecretClient
-from azure.keyvault.certificates import CertificateClient, CertificatePolicy, KeyVaultCertificate
+from azure.keyvault.certificates import CertificateClient, CertificatePolicy, CertificateContentType
 from azure.identity import AzureCliCredential, DefaultAzureCredential, ManagedIdentityCredential
 
 if TYPE_CHECKING:
-    from azure.keyvault.certificates import DeletedCertificate
+    from azure.keyvault.certificates import DeletedCertificate, KeyVaultCertificate
+
+def _read_certificate_file(certificate_path: str) -> bytes:
+    """Read a certificate file from disk and return its bytes.
+
+    Notes:
+        For PEM imports, the returned bytes must contain both the private key and
+        the certificate(s). If your key and cert are separate files, use
+        `read_pem_bundle` instead.
+
+    Args:
+        path: Path to a certificate file (e.g., `.pfx`, `.pem`, `.cer`).
+
+    Returns:
+        Raw bytes of the certificate file.
+
+    Raises:
+        FileNotFoundError: If the certificate file does not exist.
+        IOError: If there is an error reading the file.
+    """
+    if not os.path.isfile(certificate_path):
+        raise FileNotFoundError(f"Certificate file not found: {certificate_path}")
+
+    try:
+        with open(certificate_path, 'rb') as cert_file:
+            certificate_bytes = cert_file.read()
+        return certificate_bytes
+    except IOError as e:
+        raise IOError(f"Error reading certificate file {certificate_path}: {e}")
 
 class AzureKeyvaultClient:
     """
@@ -170,7 +200,7 @@ class AzureKeyvaultClient:
 
         return recovered_secret
 
-    def get_keyvault_certificate(self, certificate_name: str) -> KeyVaultCertificate:
+    def get_keyvault_certificate(self, certificate_name: str) -> "KeyVaultCertificate":
         """Get a certificate (latest version) from the Key Vault.
 
         Args:
@@ -194,15 +224,15 @@ class AzureKeyvaultClient:
         self,
         certificate_name: str,
         certificate_bytes: bytes,
-        password: str | None = None,
-        enabled: bool | None = None,
-        tags: dict | None = None,
-    ):
+        **kwargs
+    ) -> "KeyVaultCertificate":
         """Import a certificate (e.g., PFX/PKCS12) into the Key Vault.
 
         Args:
             certificate_name: The name of the certificate to create/update.
             certificate_bytes: The certificate bytes (DER-encoded .cer or PFX).
+        
+        Kwargs:
             password: Password for the PFX if applicable.
             enabled: Whether the certificate should be enabled.
             tags: Optional tags to associate with the certificate.
@@ -210,12 +240,44 @@ class AzureKeyvaultClient:
         Returns:
             The imported KeyVaultCertificate.
         """
+        
         return self.certificate_client.import_certificate(
-            name=certificate_name,
+            certificate_name=certificate_name,
             certificate_bytes=certificate_bytes,
-            password=password,
-            enabled=enabled,
-            tags=tags,
+            **kwargs
+        )
+    
+    def import_keyvault_certificate_from_file(
+        self,
+        certificate_name: str,
+        certificate_path: str,
+        **kwargs
+    ) -> "KeyVaultCertificate":
+        """Import a certificate from a file into the Key Vault.
+
+        Args:
+            certificate_name: The name of the certificate to create/update.
+            certificate_path: Path to the certificate file (.cer or .pfx).
+        
+        Kwargs:
+            password: Password for the PFX if applicable.
+            enabled: Whether the certificate should be enabled.
+            tags: Optional tags to associate with the certificate.
+
+        Returns:
+            The imported KeyVaultCertificate.
+        """
+        certificate_bytes: bytes = _read_certificate_file(certificate_path)
+
+        # Policy must be added if importing a .pem file
+        if ".pem" in certificate_path:
+            policy = CertificatePolicy(content_type=CertificateContentType.pem)
+            kwargs["policy"] = policy
+
+        return self.import_keyvault_certificate(
+            certificate_name=certificate_name,
+            certificate_bytes=certificate_bytes,
+            **kwargs
         )
 
     def delete_keyvault_certificate(self, certificate_name: str) -> "DeletedCertificate":
