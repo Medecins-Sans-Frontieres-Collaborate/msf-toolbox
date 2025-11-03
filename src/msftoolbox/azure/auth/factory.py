@@ -63,12 +63,8 @@ def get_credential(config: AuthConfig | None = None) -> TokenCredential:
             return InteractiveBrowserCredential(
                 tenant_id=cfg.tenant_id,
                 client_id=cfg.client_id,
-                token_file_path=str(cfg.federated_token_file),
                 authority=authority,
-            )
-        case Strategy.INTERACTIVE_BROWSER:
-            return InteractiveBrowserCredential(
-                tenant_id=cfg.tenant_id, client_id=cfg.client_id, authority=authority
+                redirect_uri=cfg.redirect_uri,
             )
         case Strategy.USERNAME_PASSWORD:
             # client_id is recommended; tenant_id optional depending on app

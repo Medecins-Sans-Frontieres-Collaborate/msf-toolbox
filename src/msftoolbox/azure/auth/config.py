@@ -86,6 +86,10 @@ class AuthConfig(BaseSettings):
         default=None,
         validation_alias=AliasChoices("password", "PASSWORD"),
     )
+    redirect_uri: str | None = Field(
+        default="http://localhost:8400",
+        validation_alias=AliasChoices("redirect_uri", "REDIRECT_URI"),
+    )
     authority: str | None = Field(
         default=None,
         validation_alias=AliasChoices("authority", "AUTHORITY_HOST"),
@@ -128,6 +132,11 @@ class AuthConfig(BaseSettings):
             ):
                 raise ValueError(
                     "username_password requires tenant_id, client_id, username, password and client_secret."
+                )
+        elif s is Strategy.INTERACTIVE_BROWSER:
+            if not (self.tenant_id and self.client_id and self.redirect_uri):
+                raise ValueError(
+                    "interactive_broswer requires tenant_id, client_id and redirect_uri (set in App Registration)."
                 )
         # DEFAULT, CLI, MANAGED_IDENTITY, INTERACTIVE_BROWSER validated at runtime.
         return self
