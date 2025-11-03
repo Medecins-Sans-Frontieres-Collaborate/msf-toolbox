@@ -1,8 +1,12 @@
-from typing import List, Optional
-from office365.runtime.auth.user_credential import UserCredential
-from office365.runtime.auth.client_credential import ClientCredential
-from office365.sharepoint.client_context import ClientContext
+from __future__ import annotations
+
 import os
+from typing import List
+from warnings import warn
+
+from msftoolbox.azure.auth.config import AuthConfig, Strategy
+from msftoolbox.sharepoint.context import build_client_context
+
 
 class SharePointFileClient:
     """
@@ -15,53 +19,61 @@ class SharePointFileClient:
     def __init__(
         self,
         site_url: str,
-        username: Optional[str] = None,
-        password: Optional[str] = None,
-        client_id: Optional[str] = None,
-        client_secret: Optional[str] = None,
-        interactive_auth: Optional[bool] = False,
-        tenant_id: Optional[str] = None,
-        thumbprint: Optional[str] = None,
-        certificate_path: Optional[str] = None,
-        ):
+        *,
+        auth: AuthConfig | None = None,
+        # Legacy (deprecated) parameters:
+        username: str | None = None,
+        password: str | None = None,
+        client_id: str | None = None,
+        client_secret: str | None = None,
+        interactive_auth: bool | None = None,
+        tenant_id: str | None = None,
+        thumbprint: str | None = None,
+        certificate_path: str | None = None,
+    ):
         """
         Initializes the SharePointClient with site URL and user credentials.
         The Client supports three authentication methods:
-            - Non MFA enabled account using username and password
             - App Registration using client id and client secret
             - Interactive authentication using an app registration with delegated Sharepoint permission and a tenant id.
             - With a Certificate using the client id, tenant id, selfsigned certificate and thumbprint.
         Args:
-            site_url (str): The URL of the SharePoint site.
-            username (Optional[str]): The username for authentication.
-            password (Optional[str]): The password for authentication.
-            client_id (Optional[str]): The client ID for app or interactive authentication.
-            client_secret (Optional[str]): The client secret for app.
-            interactive_auth (Optional[bool]): Boolean to indicate whether to request user consent to log in.
-            tenant_id (Optional[str]): The ID for the Azure Tenant.
-            thumbprint (Optional[str]): The hexadecimal thumbprint from your certificate
-            certificate_path (Optional[str]): The path to the selfsigned certificate
+            site_url: The URL of the SharePoint site.
+            auth: Optional custom AuthConfig, or environment variables are used.
         """
         self.site_url = site_url
 
-        if username and password:
-            self.credentials = UserCredential(username, password)
-            self.context = ClientContext(site_url).with_credentials(self.credentials)
-        elif client_id and client_secret:
-            self.credentials = ClientCredential(client_id, client_secret)
-            self.context = ClientContext(site_url).with_credentials(self.credentials)
-        elif interactive_auth and client_id and tenant_id:
-            self.context = ClientContext(site_url).with_interactive(tenant_id, client_id)
-        elif client_id and tenant_id and thumbprint and certificate_path:
-            self.context = ClientContext(site_url).with_client_certificate(
-                tenant = tenant_id, 
-                client_id = client_id, 
-                thumbprint = thumbprint, 
-                cert_path = certificate_path 
-                )
-        else:
-            raise ValueError("Either username/password, client_id/client_secret or interactive_auth/client_id/tenant_id must be provided.")
+        if auth is None and any(
+            v is not None
+            for v in (
+                username,
+                password,
+                client_id,
+                client_secret,
+                interactive_auth,
+                tenant_id,
+                thumbprint,
+                certificate_path,
+            )
+        ):
+            warn(
+                "Passing credential kwargs directly to SharePointFileClient is "
+                "deprecated; construct an AuthConfig and pass 'auth=...'.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+            auth = _auth_from_legacy_kwargs(
+                username=username,
+                password=password,
+                client_id=client_id,
+                client_secret=client_secret,
+                interactive_auth=interactive_auth,
+                tenant_id=tenant_id,
+                thumbprint=thumbprint,
+                certificate_path=certificate_path,
+            )
 
+        self.context = build_client_context(site_url=site_url, auth_config=auth)
 
     def list_files_in_folder(
         self,
@@ -429,3 +441,78 @@ class SharePointFileClient:
 
         folder_test = folder_test.properties.get("Exists", False)
         return folder_test
+
+
+def _auth_from_legacy_kwargs(
+    *,
+    username: str | None,
+    password: str | None,
+    client_id: str | None,
+    client_secret: str | None,
+    interactive_auth: bool | None,
+    tenant_id: str | None,
+    thumbprint: str | None,  # kept for compatibility; ignored
+    certificate_path: str | None,
+) -> AuthConfig:
+    """Translate legacy kwargs to an AuthConfig, validating per strategy.
+
+    Args:
+        username (Optional[str]): The username for authentication.
+        password (Optional[str]): The password for authentication.
+        client_id (Optional[str]): The client ID for app or interactive authentication.
+        client_secret (Optional[str]): The client secret for app.
+        interactive_auth (Optional[bool]): Boolean to indicate whether to request user consent to log in.
+        tenant_id (Optional[str]): The ID for the Azure Tenant.
+        thumbprint (Optional[str]): The hexadecimal thumbprint from your certificate
+        certificate_path (Optional[str]): The path to the selfsigned certificate
+    """
+    # 1) Interactive browser
+    if interactive_auth and client_id and tenant_id:
+        return AuthConfig(
+            strategy=Strategy.INTERACTIVE_BROWSER,
+            client_id=client_id,
+            tenant_id=tenant_id,
+        )
+
+    # 2) Client secret (requires tenant)
+    if client_id and client_secret and tenant_id:
+        return AuthConfig(
+            strategy=Strategy.CLIENT_SECRET,
+            client_id=client_id,
+            client_secret=client_secret,
+            tenant_id=tenant_id,
+        )
+
+    # 3) Client certificate (requires tenant + path)
+    if client_id and tenant_id and certificate_path:
+        return AuthConfig(
+            strategy=Strategy.CLIENT_CERTIFICATE,
+            client_id=client_id,
+            tenant_id=tenant_id,
+            certificate_path=certificate_path,
+        )
+
+    # 4) Username/password — only supported when paired with app registration (deprecated)
+    if username and password and client_id and client_secret and tenant_id:
+        return AuthConfig(
+            strategy=Strategy.USERNAME_PASSWORD,
+            client_id=client_id,
+            client_secret=client_secret,
+            tenant_id=tenant_id,
+            username=username,
+            password=password,
+        )
+
+    # Non-MFA username/password without an app is no longer supported
+    if username or password:
+        raise ValueError(
+            "Username/password without an app registration is no longer supported. "
+            "Register an app and use Strategy.USERNAME_PASSWORD (deprecated) or "
+            "prefer INTERACTIVE_BROWSER / CLIENT_SECRET / CLIENT_CERTIFICATE."
+        )
+
+    raise ValueError(
+        "Could not determine authentication strategy from legacy parameters. "
+        "Provide 'auth=AuthConfig(...)' or include tenant_id with client_id/client_secret, "
+        "or client_id/tenant_id/certificate_path for certificate auth."
+    )
