@@ -9,7 +9,6 @@ from azure.identity import (
     InteractiveBrowserCredential,
     ManagedIdentityCredential,
     UsernamePasswordCredential,
-    WorkloadIdentityCredential,
 )
 
 from .config import AuthConfig, Strategy
@@ -53,8 +52,15 @@ def get_credential(config: AuthConfig | None = None) -> TokenCredential:
                 ),
                 authority=authority,
             )
-        case Strategy.WORKLOAD_IDENTITY:
-            return WorkloadIdentityCredential(
+        # case Strategy.WORKLOAD_IDENTITY:
+        #     return WorkloadIdentityCredential(
+        #         tenant_id=cfg.tenant_id,
+        #         client_id=cfg.client_id,
+        #         token_file_path=str(cfg.federated_token_file),
+        #         authority=authority,
+        #     )
+        case Strategy.INTERACTIVE_BROWSER:
+            return InteractiveBrowserCredential(
                 tenant_id=cfg.tenant_id,
                 client_id=cfg.client_id,
                 token_file_path=str(cfg.federated_token_file),

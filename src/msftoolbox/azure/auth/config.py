@@ -15,7 +15,7 @@ class Strategy(str, Enum):
     MANAGED_IDENTITY = "managed_identity"
     CLIENT_SECRET = "client_secret"
     CLIENT_CERTIFICATE = "client_certificate"
-    WORKLOAD_IDENTITY = "workload_identity"
+    # WORKLOAD_IDENTITY = "workload_identity"  # TODO: Implement Workload Identity
     INTERACTIVE_BROWSER = "interactive_browser"
     USERNAME_PASSWORD = "username_password"  # Deprecated 30 September, 2025
 
@@ -113,11 +113,11 @@ class AuthConfig(BaseSettings):
                 raise ValueError(
                     "client_certificate requires tenant_id, client_id, and certificate_path."
                 )
-        elif s is Strategy.WORKLOAD_IDENTITY:
-            if not (self.tenant_id and self.client_id and self.federated_token_file):
-                raise ValueError(
-                    "workload_identity requires tenant_id, client_id, and federated_token_file."
-                )
+        # elif s is Strategy.WORKLOAD_IDENTITY:
+        #     if not (self.tenant_id and self.client_id and self.federated_token_file):
+        #         raise ValueError(
+        #             "workload_identity requires tenant_id, client_id, and federated_token_file."
+        #         )
         elif s is Strategy.USERNAME_PASSWORD:
             if not (
                 self.tenant_id
