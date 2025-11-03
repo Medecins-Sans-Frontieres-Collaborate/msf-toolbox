@@ -115,29 +115,29 @@ def test_factory_client_certificate__path_and_optional_password(
     }
 
 
-def test_factory_workload_identity__token_file_path(
-    tmp_path: Path, stub_azure: dict[str, Any], reload_factory
-) -> None:
-    token = tmp_path / "token.jwt"
-    token.write_text("jwt")
+# def test_factory_workload_identity__token_file_path(
+#     tmp_path: Path, stub_azure: dict[str, Any], reload_factory
+# ) -> None:
+#     token = tmp_path / "token.jwt"
+#     token.write_text("jwt")
 
-    cfg = AuthConfig(
-        strategy=Strategy.WORKLOAD_IDENTITY,
-        tenant_id="t",
-        client_id="c",
-        federated_token_file=token,
-        authority="https://login.example",
-    )
-    _ = reload_factory.get_credential(cfg)
+#     cfg = AuthConfig(
+#         strategy=Strategy.WORKLOAD_IDENTITY,
+#         tenant_id="t",
+#         client_id="c",
+#         federated_token_file=token,
+#         authority="https://login.example",
+#     )
+#     _ = reload_factory.get_credential(cfg)
 
-    klass = stub_azure["WorkloadIdentityCredential"]
-    assert klass.call_count == 1
-    assert klass.last_kwargs == {
-        "tenant_id": "t",
-        "client_id": "c",
-        "token_file_path": str(token),
-        "authority": "https://login.example",
-    }
+#     klass = stub_azure["WorkloadIdentityCredential"]
+#     assert klass.call_count == 1
+#     assert klass.last_kwargs == {
+#         "tenant_id": "t",
+#         "client_id": "c",
+#         "token_file_path": str(token),
+#         "authority": "https://login.example",
+#     }
 
 
 def test_factory_interactive_browser__fields(

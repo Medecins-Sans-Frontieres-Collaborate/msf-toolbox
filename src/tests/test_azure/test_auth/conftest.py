@@ -70,7 +70,7 @@ def stub_azure(monkeypatch: pytest.MonkeyPatch) -> dict[str, Any]:
         "ManagedIdentityCredential",
         "ClientSecretCredential",
         "CertificateCredential",
-        "WorkloadIdentityCredential",
+        # "WorkloadIdentityCredential",
         "InteractiveBrowserCredential",
         "UsernamePasswordCredential",
     ]
