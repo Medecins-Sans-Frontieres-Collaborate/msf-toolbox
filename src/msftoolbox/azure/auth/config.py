@@ -27,19 +27,23 @@ class AuthConfig(BaseSettings):
     prefix (e.g., ``AZURE_TENANT_ID``) and performs cross-field validation
     based on the selected :class:`Strategy`.
 
-    Environment variables (aliases supported where noted):
+    Environment variables (aliases supported):
         - AZURE_AUTH_STRATEGY
         - AZURE_TENANT_ID
-        - AZURE_CLIENT_ID (alias: AZURE_MANAGED_IDENTITY_CLIENT_ID)
+        - AZURE_CLIENT_ID
         - AZURE_CLIENT_SECRET
         - AZURE_CLIENT_CERTIFICATE_PATH
         - AZURE_CLIENT_CERTIFICATE_PASSWORD
         - AZURE_FEDERATED_TOKEN_FILE
         - AZURE_AUTHORITY_HOST
+        - USERNAME
+        - PASSWORD
+        - REDIRECT_URI
     """
 
     model_config = SettingsConfigDict(
         case_sensitive=False,
+        env_prefix="AZURE_",
         extra="ignore",
     )
 
@@ -49,34 +53,47 @@ class AuthConfig(BaseSettings):
 
     strategy: Strategy = Field(
         default=Strategy.DEFAULT,
-        validation_alias=AliasChoices("strategy", "AUTH_STRATEGY", "STRATEGY"),
+        validation_alias=AliasChoices(
+            "strategy", "AUTH_STRATEGY", "STRATEGY", "AZURE_AUTH_STRATEGY"
+        ),
     )
     tenant_id: str | None = Field(
-        default=None, validation_alias=AliasChoices("tenant_id", "TENANT_ID")
+        default=None,
+        validation_alias=AliasChoices("tenant_id", "TENANT_ID", "AZURE_TENANT_ID"),
     )
     client_id: str | None = Field(
         default=None,
         validation_alias=AliasChoices(
-            "client_id", "CLIENT_ID", "MANAGED_IDENTITY_CLIENT_ID"
+            "client_id", "CLIENT_ID", "MANAGED_IDENTITY_CLIENT_ID", "AZURE_CLIENT_ID"
         ),
     )
     client_secret: SecretStr | None = Field(
         default=None,
-        validation_alias=AliasChoices("client_secret", "CLIENT_SECRET"),
+        validation_alias=AliasChoices(
+            "client_secret", "CLIENT_SECRET", "AZURE_CLIENT_SECRET"
+        ),
     )
     certificate_path: Path | None = Field(
         default=None,
-        validation_alias=AliasChoices("certificate_path", "CLIENT_CERTIFICATE_PATH"),
+        validation_alias=AliasChoices(
+            "certificate_path",
+            "CLIENT_CERTIFICATE_PATH",
+            "AZURE_CLIENT_CERTIFICATE_PATH",
+        ),
     )
     certificate_password: SecretStr | None = Field(
         default=None,
         validation_alias=AliasChoices(
-            "certificate_password", "CLIENT_CERTIFICATE_PASSWORD"
+            "certificate_password",
+            "CLIENT_CERTIFICATE_PASSWORD",
+            "AZURE_CLIENT_CERTIFICATE_PASSWORD",
         ),
     )
     federated_token_file: Path | None = Field(
         default=None,
-        validation_alias=AliasChoices("federated_token_file", "FEDERATED_TOKEN_FILE"),
+        validation_alias=AliasChoices(
+            "federated_token_file", "FEDERATED_TOKEN_FILE", "AZURE_FEDERATED_TOKEN_FILE"
+        ),
     )
     username: Path | None = Field(
         default=None,
@@ -92,7 +109,9 @@ class AuthConfig(BaseSettings):
     )
     authority: str | None = Field(
         default=None,
-        validation_alias=AliasChoices("authority", "AUTHORITY_HOST"),
+        validation_alias=AliasChoices(
+            "authority", "AUTHORITY_HOST", "AZURE_AUTHORITY_HOST"
+        ),
     )
 
     @field_validator("certificate_path", "federated_token_file")
