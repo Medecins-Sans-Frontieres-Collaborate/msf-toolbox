@@ -24,16 +24,15 @@ if TYPE_CHECKING:
     from azure.keyvault.certificates import DeletedCertificate
 
 
-def _read_certificate_file(certificate_path: str) -> bytes:
+def _read_certificate_file(certificate_path: str | Path) -> bytes:
     """Read a certificate file from disk and return its bytes.
 
     Notes:
         For PEM imports, the returned bytes must contain both the private key and
-        the certificate(s). If your key and cert are separate files, use
-        `read_pem_bundle` instead.
+        the certificate(s).
 
     Args:
-        path: Path to a certificate file (e.g., `.pfx`, `.pem`, `.cer`).
+        certificate_path: Path to a certificate file (for example, ``.pfx``, ``.pem``, ``.cer``).
 
     Returns:
         Raw bytes of the certificate file.
@@ -74,17 +73,18 @@ class AzureKeyvaultClient:
             managed_identity_client_id: Optional managed identity client ID used
                 when authenticating with ``ManagedIdentityCredential``.
         """
-        self.local_run = local_run
-        self.managed_identity_client_id = managed_identity_client_id
-        self.credential = self._get_credential()
-        self.keyvault_url = keyvault_url
-        self.keyvault_client = SecretClient(
+        self.local_run: bool = local_run
+        self.managed_identity_client_id: str | None = managed_identity_client_id
+        self.credential: TokenCredential = self._get_credential()
+        self.keyvault_url: str = keyvault_url
+
+        self.keyvault_client: SecretClient = SecretClient(
             vault_url=self.keyvault_url,
-            credential=self.credential
-            )
-        
-        self.certificate_client = CertificateClient(
-            vault_url=self.keyvault_url, credential=self.credential
+            credential=self.credential,
+        )
+        self.certificate_client: CertificateClient = CertificateClient(
+            vault_url=self.keyvault_url,
+            credential=self.credential,
         )
 
     def _get_credential(self) -> TokenCredential:
@@ -194,6 +194,60 @@ class AzureKeyvaultClient:
             The KeyVaultCertificate including policy and properties.
         """
         return self.certificate_client.get_certificate(certificate_name)
+
+    def save_cert_string_to_pem(
+        self,
+        cert_string: str,
+        out_path: str | Path,
+    ) -> None:
+        """Save a certificate string to a PEM file.
+
+        If the input already appears to be PEM (contains BEGIN/END markers),
+        it is written as-is. Otherwise, it is treated as a base64-encoded DER
+        blob and wrapped into PEM format.
+
+        Args:
+            cert_string: Certificate content from Azure Key Vault.
+            out_path: Destination path for the output PEM file.
+
+        Raises:
+            ValueError: If ``cert_string`` is empty.
+        """
+        if not cert_string:
+            raise ValueError(
+                "cert_string is empty. Did you actually fetch it from Key Vault?",
+            )
+
+        cert_string = cert_string.strip()
+
+        # Case 1: Already PEM.
+        if "-----BEGIN" in cert_string:
+            pem_bytes = cert_string.encode("ascii")
+        else:
+            # Case 2: Base64-encoded DER (most common from Key Vault secrets).
+            der_bytes = b64decode(cert_string)
+            pem_str = PEM.encode(der_bytes, "CERTIFICATE")
+            pem_bytes = pem_str.encode("ascii")
+
+        output_path = Path(out_path)
+        output_path.write_bytes(pem_bytes)
+
+    def save_keyvault_certificate_to_pem(
+        self,
+        certificate_name: str,
+        out_path: str | Path,
+    ) -> None:
+        """Save a keyvault certificate to a PEM file.
+
+        Args:
+            certificate_name: Certificate name in Azure Key Vault.
+            out_path: Destination path for the output PEM file.
+
+        Raises:
+            ResourceNotFoundError: If the certificate does not exist in Key Vault.
+        """
+        secret_value = self.get_keyvault_secret_value(certificate_name)
+        self.save_cert_string_to_pem(secret_value, out_path)
 
     def list_certificate_names(self) -> list[str]:
         """List all certificate names in the Key Vault.
