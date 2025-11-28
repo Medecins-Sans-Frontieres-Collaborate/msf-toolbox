@@ -104,9 +104,9 @@ def test_username_password_strategy__requires_fields() -> None:
 
 def test_env_aliases__client_id_and_authority(monkeypatch: pytest.MonkeyPatch) -> None:
     """Validate env alias reading for client_id and authority host."""
-    monkeypatch.setenv("AUTH_STRATEGY", "managed_identity")
+    monkeypatch.setenv("AZURE_AUTH_STRATEGY", "managed_identity")
     monkeypatch.setenv("MANAGED_IDENTITY_CLIENT_ID", "abc-123")
-    monkeypatch.setenv("AUTHORITY_HOST", "https://login.microsoftonline.com")
+    monkeypatch.setenv("aZURE_AUTHORITY_HOST", "https://login.microsoftonline.com")
 
     cfg = AuthConfig()
     assert cfg.strategy is Strategy.MANAGED_IDENTITY

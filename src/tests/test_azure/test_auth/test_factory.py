@@ -147,6 +147,7 @@ def test_factory_interactive_browser__fields(
         strategy=Strategy.INTERACTIVE_BROWSER,
         tenant_id="t",
         client_id="c",
+        redirect_uri="http://localhost:8400",
         authority="https://login.example",
     )
     _ = reload_factory.get_credential(cfg)
@@ -156,6 +157,7 @@ def test_factory_interactive_browser__fields(
     assert klass.last_kwargs == {
         "tenant_id": "t",
         "client_id": "c",
+        "redirect_uri": "http://localhost:8400",
         "authority": "https://login.example",
     }
 
