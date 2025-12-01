@@ -5,15 +5,29 @@ from office365.runtime.auth.token_response import TokenResponse
 from office365.sharepoint.client_context import ClientContext
 
 from msftoolbox.azure.auth import get_credential, scopes
+from msftoolbox.azure.auth.config import Strategy
 
 if TYPE_CHECKING:
+    from azure.core.credentials import TokenCredential
+
     from msftoolbox.azure.auth.config import AuthConfig
 
 
 def build_client_context(
     site_url: str, auth_config: "AuthConfig" = None
 ) -> ClientContext:
-    cred = get_credential(auth_config)
+    """Build a SharePoint ClientContext using Azure authentication.
+
+    Args:
+        site_url: The absolute SharePoint site URL (including url scheme).
+        auth_config: Authentication configuration. If ``None``, default credential is used.
+    """
+    if auth_config.strategy == Strategy.CLIENT_SECRET:
+        raise ValueError(
+            "ClientContext with CLIENT_SECRET strategy is not supported. "
+            "Use Certificate, Managed Identity, or Interactive Browser."
+        )
+    cred: TokenCredential = get_credential(auth_config)
     scope = scopes.spo_scope_from_url(site_url)
 
     def _factory() -> TokenResponse:
