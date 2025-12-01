@@ -37,6 +37,7 @@ class SharePointFileClient:
         self._core = SharePointClient(
             site_url=site_url,
             auth=auth,
+            backend="legacy",
             username=username,
             password=password,
             client_id=client_id,
