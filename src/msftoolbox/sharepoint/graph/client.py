@@ -11,6 +11,7 @@ from msftoolbox.azure.auth.config import AuthConfig
 from msftoolbox.sharepoint.models import FileItem, FolderItem
 
 from .context import build_graph_client
+from .utils import convert_sharepoint_url, get_encoded_relative_path
 
 logger = logging.getLogger(__name__)
 
@@ -74,21 +75,6 @@ class GraphFileClient:
             page = _fetch(initial=False, next_link=next_link)
 
     @staticmethod
-    def convert_sharepoint_url(url: str) -> str:
-        # Remove the scheme (http:// or https://)
-        if url.startswith("https://"):
-            url = url[len("https://") :]
-        elif url.startswith("http://"):
-            url = url[len("http://") :]
-
-        # Replace the first '/' with ':/' to match the desired format
-        parts = url.split("/", 1)
-        if len(parts) == 2:
-            return f"{parts[0]}:/{parts[1]}"
-        else:
-            return f"{parts[0]}:/"
-
-    @staticmethod
     def _map_file_properties(sp_file, keep_metadata: bool = True) -> FileItem:
         item = FileItem(
             name=sp_file.get("name"),
@@ -112,7 +98,7 @@ class GraphFileClient:
         return item
 
     def get_site_id(self):
-        formatted_url = self.convert_sharepoint_url(self._site_url)
+        formatted_url = convert_sharepoint_url(self._site_url)
         url = f"https://graph.microsoft.com/v1.0/sites/{formatted_url}"
 
         response = requests.get(url, headers=self._headers)
@@ -141,16 +127,11 @@ class GraphFileClient:
         )
         return None
 
-    @staticmethod
-    def get_encoded_relative_path(server_relative_url: str) -> str:
-        # The relative path must be encoded for special characters
-        return urllib.parse.quote(server_relative_url.strip("/").split("/", 1)[1])
-
     def parse_server_relative_url(self, server_relative_url: str) -> tuple(
         str | None, str
     ):
         drive_id: str | None = self.get_library_id_from_url(server_relative_url)
-        relative_path: str = self.get_encoded_relative_path(server_relative_url)
+        relative_path: str = get_encoded_relative_path(server_relative_url)
 
         return drive_id, relative_path
 
