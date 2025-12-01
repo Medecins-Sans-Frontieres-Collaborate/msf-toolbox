@@ -74,6 +74,6 @@ class FileClient(Protocol):
         """Create a folder if it does not exist."""
         raise NotImplementedError
 
-    def test_folder_existence(self, folder_url: str) -> bool:
+    def folder_exists(self, folder_url: str) -> bool:
         """Return True if the folder exists."""
         raise NotImplementedError
