@@ -33,8 +33,12 @@ class LegacyFileClient:
         """
         self._site_url = site_url
         self._auth = auth
+        # Context scope requires scheme, whereas client requires no scheme
+        absolute_site_url = (
+            f"https://{site_url}" if not site_url.startswith("http") else site_url
+        )
         self.context: ClientContext = build_client_context(
-            site_url=site_url, auth_config=auth
+            site_url=absolute_site_url, auth_config=auth
         )
 
     @staticmethod
