@@ -56,15 +56,27 @@ The default auth method will try first try pull from your local `.env` file:
 
 #### Inline
 
+Available strategies can be found [here](../azure/auth/config.py#L10), and can either be imported or you can type the string:
+
+```python
+Strategy.DEFAULT = "default"
+Strategy.CLI = "cli"
+Strategy.MANAGED_IDENTITY = "managed_identity"
+Strategy.CLIENT_SECRET = "client_secret"
+Strategy.CLIENT_CERTIFICATE = "client_certificate"
+Strategy.INTERACTIVE_BROWSER = "interactive_browser"
+Strategy.USERNAME_PASSWORD = "username_password"  # Deprecated 30 September, 2025
+```
+
 ##### Using Client ID and Secret 
 ```python
-from msftoolbox.azure.auth.config import AuthConfig, Strategy
+from msftoolbox.azure.auth.config import AuthConfig
 from msftoolbox.sharepoint.client import SharePointClient
 
 client = SharePointClient(
     site_url="https://your-site-url",
     auth=AuthConfig(
-        strategy=Strategy.CLIENT_SECRET,
+        strategy="client_secret",
         tenant_id="your-tenant-id",
         client_id="your-client-id",
         client_secret="your-client-secret",

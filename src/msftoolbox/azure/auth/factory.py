@@ -18,7 +18,7 @@ def get_credential(config: AuthConfig | None = None) -> TokenCredential:
     """Construct a :class:`TokenCredential` based on :class:`AuthConfig`.
 
     Args:
-        config: Auth configuration. If ``None``, :meth:`AuthConfig.from_env` is used.
+        config: Auth configuration. If ``None``, default credential is used.
 
     Returns:
         A concrete :class:`TokenCredential`.
