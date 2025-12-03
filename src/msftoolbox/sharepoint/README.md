@@ -16,7 +16,7 @@
 
 The SharePointClient takes two main arguments for initialisation, the `site_url` and `auth` method.
 ```python
-from msftoolbox.sharepoint.client import SharePointClient
+from msftoolbox.sharepoint import SharePointClient
 
 client = SharePointClient(
     site_url="https://your-site-url",
@@ -27,7 +27,7 @@ client = SharePointClient(
 Initialising the client this way will force it to prefer Microsoft Graph whenever possible, and fall back to SharePoint Rest API otherwise. To change this behaviour, you can
 specify a `backend`:
 ```python
-from msftoolbox.sharepoint.client import SharePointClient
+from msftoolbox.sharepoint import SharePointClient
 
 client = SharePointClient(
     site_url="https://your-site-url",
@@ -70,8 +70,8 @@ Strategy.USERNAME_PASSWORD = "username_password"  # Deprecated 30 September, 202
 
 ##### Using Client ID and Secret 
 ```python
-from msftoolbox.azure.auth.config import AuthConfig
-from msftoolbox.sharepoint.client import SharePointClient
+from msftoolbox.azure.auth import AuthConfig
+from msftoolbox.sharepoint import SharePointClient
 
 client = SharePointClient(
     site_url="https://your-site-url",
@@ -89,8 +89,8 @@ Fails for MFA enabled accounts.
 Requires an app registration with delegated Sharepoint API permissions.
 
 ```python
-from msftoolbox.azure.auth.config import AuthConfig, Strategy
-from msftoolbox.sharepoint.client import SharePointClient
+from msftoolbox.azure.auth import AuthConfig, Strategy
+from msftoolbox.sharepoint import SharePointClient
 
 client = SharePointClient(
     site_url="https://your-site-url",
@@ -109,8 +109,8 @@ client = SharePointClient(
 Requires an app registration with delegated Sharepoint API permissions.
 
 ```python
-from msftoolbox.azure.auth.config import AuthConfig, Strategy
-from msftoolbox.sharepoint.client import SharePointClient
+from msftoolbox.azure.auth import AuthConfig, Strategy
+from msftoolbox.sharepoint import SharePointClient
 
 client = SharePointClient(
     site_url="https://your-site-url",
@@ -128,8 +128,8 @@ Requires an app registration with Sites.Selected Application permission and site
 For detailed instructions, reach out the the OCA AI team. 
 
 ```python
-from msftoolbox.azure.auth.config import AuthConfig, Strategy
-from msftoolbox.sharepoint.client import SharePointClient
+from msftoolbox.azure.auth import AuthConfig, Strategy
+from msftoolbox.sharepoint import SharePointClient
 
 client = SharePointClient(
     site_url="https://your-site-url",
