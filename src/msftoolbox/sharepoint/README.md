@@ -10,6 +10,12 @@
 - **File and Folder Management**: List, download, upload, move, rename, and recycle files. List and create folders.
 - **Recursive Operations**: Recursively list files and folders within a directory. Please note that certain characters in URLs can cause issues such as "#".
 
+## Design Decision
+
+Currently the module seems quite convoluted, but that is to keep backward compatibility and to interface Graph and Sharepoint REST API classes together to provide the same functionality.
+
+If it is decided that the legacy Sharepoint API is no longer needed, we can begin deprecation and remove `files.py`, `interfaces.py`, `fallback_client.py`, `auth_legacy.py`, `legacy/*` and simply move the graph implementation into the module root leaving only four files (`client.py`, `context.py`, `utils.py`, `models.py`); you might even choose to merge context and utils.
+
 ## Usage
 
 ### Initialization
