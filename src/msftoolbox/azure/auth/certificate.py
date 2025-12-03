@@ -12,16 +12,17 @@ from cryptography.x509.oid import NameOID
 
 
 def generate_self_signed_certificate(
-    email_address: str,
-    common_name: str,
-    country_name: str,
-    locality_name: str,
-    state_or_province_name: str,
-    organization_name: str,
-    organizational_unit_name: str,
+    email_address: str | None,
+    common_name: str | None,
+    country_name: str | None,
+    locality_name: str | None,
+    state_or_province_name: str | None,
+    organization_name: str | None,
+    organizational_unit_name: str | None,
     serial_number: int = 1,
     validity_days: int = 365,
     key_size: int = 2048,
+    *,
     cert_path: str | Path | None = None,
     key_path: str | Path | None = None,
     combined_pem_path: str | Path | None = None,
@@ -72,20 +73,26 @@ def generate_self_signed_certificate(
         public_exponent=65537, key_size=key_size
     )
 
-    # Certificate subject/issuer
-    name = x509.Name(
-        [
-            x509.NameAttribute(NameOID.COUNTRY_NAME, country_name),
-            x509.NameAttribute(NameOID.STATE_OR_PROVINCE_NAME, state_or_province_name),
-            x509.NameAttribute(NameOID.LOCALITY_NAME, locality_name),
-            x509.NameAttribute(NameOID.ORGANIZATION_NAME, organization_name),
-            x509.NameAttribute(
-                NameOID.ORGANIZATIONAL_UNIT_NAME, organizational_unit_name
-            ),
-            x509.NameAttribute(NameOID.COMMON_NAME, common_name),
-            x509.NameAttribute(NameOID.EMAIL_ADDRESS, email_address),
-        ]
-    )
+    # Build subject/issuer name from only non-empty attributes.
+    name_parts: list[tuple[x509.ObjectIdentifier, str | None]] = [
+        (NameOID.COUNTRY_NAME, country_name),
+        (NameOID.STATE_OR_PROVINCE_NAME, state_or_province_name),
+        (NameOID.LOCALITY_NAME, locality_name),
+        (NameOID.ORGANIZATION_NAME, organization_name),
+        (NameOID.ORGANIZATIONAL_UNIT_NAME, organizational_unit_name),
+        (NameOID.COMMON_NAME, common_name),
+        (NameOID.EMAIL_ADDRESS, email_address),
+    ]
+
+    attributes: list[x509.NameAttribute[str]] = [
+        x509.NameAttribute(oid, value) for oid, value in name_parts if value
+    ]
+
+    if not attributes:
+        raise ValueError("At least one subject name attribute must be provided.")
+
+    name = x509.Name(attributes)
+    now = datetime.utcnow()
 
     # Build the certificate
     cert = (
@@ -94,8 +101,8 @@ def generate_self_signed_certificate(
         .issuer_name(name)
         .public_key(key.public_key())
         .serial_number(serial_number)
-        .not_valid_before(datetime.utcnow())
-        .not_valid_after(datetime.utcnow() + timedelta(days=validity_days))
+        .not_valid_before(now)
+        .not_valid_after(now + timedelta(days=validity_days))
         .add_extension(x509.BasicConstraints(ca=True, path_length=None), critical=True)
         .sign(private_key=key, algorithm=hashes.SHA512())
     )
@@ -121,12 +128,12 @@ def generate_self_signed_certificate(
 if __name__ == "__main__":
     # Example usage with placeholder subject fields.
     generate_self_signed_certificate(
-        email_address="email@example.com",
-        common_name="example.com",
-        country_name="NT",
-        locality_name="Example City",
-        state_or_province_name="Example State",
-        organization_name="Example Org",
-        organizational_unit_name="Example Unit",
+        email_address=None,
+        common_name=None,
+        country_name="NL",
+        locality_name="Amsterdam",
+        state_or_province_name=None,
+        organization_name="MSF",
+        organizational_unit_name="OCA",
         combined_pem_path="selfsigned_with_key.pem",
     )
