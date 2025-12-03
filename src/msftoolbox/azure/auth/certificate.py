@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Optional
 
 from cryptography import x509
 from cryptography.hazmat.primitives import hashes, serialization
@@ -23,9 +22,9 @@ def generate_self_signed_certificate(
     serial_number: int = 1,
     validity_days: int = 365,
     key_size: int = 2048,
-    cert_path: Optional[str | Path] = "selfsigned.crt",
-    key_path: Optional[str | Path] = "private.key",
-    combined_pem_path: Optional[str | Path] = None,
+    cert_path: str | Path | None = None,
+    key_path: str | Path | None = None,
+    combined_pem_path: str | Path | None = None,
 ) -> tuple[bytes, bytes]:
     """Generate a self-signed X.509 certificate and private key.
 
@@ -44,9 +43,9 @@ def generate_self_signed_certificate(
         validity_days: Offset in days from now for the certificate
             expiration time.
         key_size: RSA key size in bits.
-        cert_path: Optional path to write the certificate file. If ``None``, the
+        cert_path: Optional path to write the certificate file (.crt). If ``None``, the
             certificate is not written to disk.
-        key_path: Optional path to write the private key file. If ``None``, the
+        key_path: Optional path to write the private key file (.key). If ``None``, the
             private key is not written to disk.
         combined_pem_path: Optional path to write a combined PEM file containing
             both the certificate and private key. If ``None``, no combined file
@@ -58,6 +57,15 @@ def generate_self_signed_certificate(
     """
     # Example to inspect the generated certificate with OpenSSL:
     #   openssl x509 -inform pem -in selfsigned.crt -noout -text
+
+    # ---- Validate output selection ---------------------------
+    separate_mode = cert_path is not None and key_path is not None
+    combined_mode = combined_pem_path is not None
+
+    if not separate_mode and not combined_mode:
+        raise ValueError(
+            "Specify at minimum a combined_pem_path or both the cert_path and key_path."
+        )
 
     # Generate RSA private key
     key: rsa.RSAPrivateKey = rsa.generate_private_key(
@@ -100,16 +108,12 @@ def generate_self_signed_certificate(
         encryption_algorithm=serialization.NoEncryption(),
     )
 
-    # Write individual files if requested
-    if cert_path is not None:
-        Path(cert_path).write_bytes(cert_pem)
-
-    if key_path is not None:
-        Path(key_path).write_bytes(key_pem)
-
-    # Optional: combined PEM
-    if combined_pem_path is not None:
+    # --- Write output based on chosen mode ------------------------------------------
+    if combined_mode:
         Path(combined_pem_path).write_bytes(cert_pem + key_pem)
+    else:
+        Path(cert_path).write_bytes(cert_pem)
+        Path(key_path).write_bytes(key_pem)
 
     return cert_pem, key_pem
 
