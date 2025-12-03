@@ -1,4 +1,4 @@
-# msftoolbox.azure.auth
+# Azure Authentication Module
 
 Minimal, policy-driven authentication for all Azure clients in this codebase.
 
@@ -17,7 +17,7 @@ Most of our clients (Storage, Key Vault, OpenAI, Graph, SharePoint) need the sam
 * **Configuration & validation** (via Pydantic settings).
 * **Scope helpers** (so callers don’t hand-roll resource scopes).
 
-No custom base classes. No parallel provider hierarchy. We rely on Azure’s own abstraction: `azure.core.credentials.TokenCredential`.
+We rely on Azure’s own abstraction: `azure.core.credentials.TokenCredential`.
 
 ---
 
@@ -65,7 +65,7 @@ from msftoolbox.azure.auth import scopes
 
 ## Quick start
 
-### 1) Configure via environment variables (recommended)
+### Configure via environment variables
 
 Pick a strategy:
 
@@ -78,7 +78,7 @@ export AZURE_AUTH_STRATEGY=cli
 
 # or managed identity (optionally specify user-assigned)
 export AZURE_AUTH_STRATEGY=managed_identity
-export AZURE_MANAGED_IDENTITY_CLIENT_ID=<client-id>  # optional
+export AZURE_MANAGED_IDENTITY_CLIENT_ID=<client-id>
 
 # or client secret
 export AZURE_AUTH_STRATEGY=client_secret
@@ -93,12 +93,6 @@ export AZURE_CLIENT_ID=<client-id>
 export AZURE_CLIENT_CERTIFICATE_PATH=/path/to/cert.pem
 export AZURE_CLIENT_CERTIFICATE_PASSWORD=<optional-password>
 
-# or workload identity (OIDC federation)
-export AZURE_AUTH_STRATEGY=workload_identity
-export AZURE_TENANT_ID=<tenant-id>
-export AZURE_CLIENT_ID=<client-id>
-export AZURE_FEDERATED_TOKEN_FILE=/var/run/secrets/azure/tokens/azure-oidc-token
-
 # optional for sovereign clouds
 export AZURE_AUTHORITY_HOST=https://login.microsoftonline.us
 ```
@@ -111,11 +105,10 @@ from msftoolbox.azure.auth import get_credential
 credential = get_credential()  # reads env, validates, returns a TokenCredential
 ```
 
-### 2) Or configure in code
+### Or configure in code
 
 ```python
-from msftoolbox.azure.auth.config import AuthConfig, Strategy
-from msftoolbox.azure.auth import get_credential
+from msftoolbox.azure.auth import AuthConfig, Strategy, get_credential
 
 cfg = AuthConfig(
     strategy=Strategy.CLIENT_SECRET,
@@ -126,6 +119,8 @@ cfg = AuthConfig(
 
 credential = get_credential(cfg)
 ```
+
+Since Strategy is an enum, you can of course choose to just write a string equivalent e.g. "client_secret".
 
 ---
 
@@ -151,9 +146,13 @@ kv = SecretClient(vault_url="https://<vault>.vault.azure.net/", credential=cred)
 from azure.auth import get_credential, scopes
 
 cred = get_credential()
-token = cred.get_token(scopes.graph_scope())
+token = cred.get_token(scopes.GRAPH_DEFAULT_SCOPE)
 headers = {"Authorization": f"Bearer {token.token}"}
-# use with requests or MS Graph SDK
+# use with requests
+
+# or for MS Graph SDK
+from msgraph import GraphServiceClient
+graph_client = GraphServiceClient(cred, [scopes.GRAPH_DEFAULT_SCOPE])
 ```
 
 ### SharePoint (handled in `msftoolbox/sharepoint/`)
@@ -161,7 +160,6 @@ headers = {"Authorization": f"Bearer {token.token}"}
 Your SharePoint module can do:
 
 ```python
-# msftoolbox/sharepoint/context.py
 from time import time
 from office365.runtime.auth.token_response import TokenResponse
 from office365.sharepoint.client_context import ClientContext
@@ -192,13 +190,13 @@ def build_client_context(site_url: str) -> ClientContext:
 | Azure CLI           | `cli`                       | —                                                                     | `AZURE_AUTHORITY_HOST`                                       |
 | Managed Identity    | `managed_identity`          | —                                                                     | `AZURE_MANAGED_IDENTITY_CLIENT_ID`, `AZURE_AUTHORITY_HOST`   |
 | Client Secret       | `client_secret`             | `AZURE_TENANT_ID`, `AZURE_CLIENT_ID`, `AZURE_CLIENT_SECRET`           | `AZURE_AUTHORITY_HOST`                                       |
-| Client Certificate  | `client_certificate`        | `AZURE_TENANT_ID`, `AZURE_CLIENT_ID`, `AZURE_CLIENT_CERTIFICATE_PATH` | `AZURE_CLIENT_CERTIFICATE_PASSWORD`, `AZURE_AUTHORITY_HOST`  |
-| Workload Identity   | `workload_identity`         | `AZURE_TENANT_ID`, `AZURE_CLIENT_ID`, `AZURE_FEDERATED_TOKEN_FILE`    | `AZURE_AUTHORITY_HOST`                                       |
+| Client Certificate  | `client_certificate`        | `AZURE_TENANT_ID`, `AZURE_CLIENT_ID`, `AZURE_CLIENT_CERTIFICATE_PATH` | `AZURE_CLIENT_CERTIFICATE_PASSWORD`, `AZURE_AUTHORITY_HOST`  |                                     |
 | Interactive Browser | `interactive_browser`       | —                                                                     | `AZURE_TENANT_ID`, `AZURE_CLIENT_ID`, `AZURE_AUTHORITY_HOST` |
 
 Notes:
 
-* `AZURE_CLIENT_ID` and `AZURE_MANAGED_IDENTITY_CLIENT_ID` are treated as **aliases** for `client_id`.
+* All `AZURE_` prefixed environment variables are treated as **aliases** for e.g. `client_id`, `client_secret` so you can also define them
+this way in your `.env` (`CLIENT_SECRET`).
 * Paths (certificate/token file) must exist; invalid paths raise at startup.
 * Secrets use `SecretStr` when loaded from env through Pydantic; they’re only unwrapped inside the factory.
 
@@ -209,7 +207,7 @@ Notes:
 * **No custom base classes:** We rely on `TokenCredential` everywhere. One abstraction, zero indirection.
 * **Factory first:** `get_credential()` is the only way to build credentials, implemented with `match` (Python 3.10+).
 * **Pydantic settings:** Typed, validated configuration; environment-first by default.
-* **Scopes as pure functions:** `graph_scope()` and `spo_scope_from_url()` are small helpers; no hidden state.
+* **Scopes:** `spo_scope_from_url()` is a  small helper; no hidden state. `GRAPH_DEFAULT_SCOPE` is a simple constant.
 
 This makes the module easy to test, predictable to operate, and simple to extend.
 
@@ -230,7 +228,7 @@ Because callers consume only `TokenCredential`, you won’t break downstream cod
 
 ## Error handling
 
-* Misconfiguration raises a `pydantic.ValidationError` when instantiating `AuthConfig()` from env.
+* Misconfiguration raises a `pydantic.ValidationError` when instantiating `AuthConfig()` from env or in code.
 * Construction-time failures (e.g., malformed certificate) are raised by `azure-identity` on first use.
 * At runtime, `get_token()` may raise `CredentialUnavailableError` or `ClientAuthenticationError`; handle at call sites where appropriate.
 
@@ -239,22 +237,12 @@ Because callers consume only `TokenCredential`, you won’t break downstream cod
 ## Security & operations
 
 * Never log secrets. This module never prints/returns secret values.
-* Prefer managed identity or workload identity in production.
+* Prefer managed identity or client certificate in production.
 * If you rotate secrets/certs, restart processes (or build a reloading layer in your service; this module intentionally keeps no background threads).
 
 ---
 
-## FAQ
-
-**Q: Why isn’t SharePoint wiring inside `msftoolbox.azure.auth`?**
-Because SharePoint client behavior (token factory cadence, caching, CSOM specifics) is domain-specific. Keeping it in `msftoolbox/sharepoint/` avoids coupling and lets that module evolve without affecting other Azure clients. `msftoolbox.azure.auth` provides only the credential and scope helpers it needs.
-
-**Q: Do we need internal provider wrappers?**
-Not now. If we later need metrics, leeway caching, or multi-tenant routing, we can add optional wrappers in `msftoolbox/azure/auth/_wrappers/` without changing public APIs.
-
----
-
-## Example end-to-end snippet
+## Example Workflow
 
 ```python
 from msftoolbox.azure.auth import get_credential, scopes
