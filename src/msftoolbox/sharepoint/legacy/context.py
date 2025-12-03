@@ -22,10 +22,11 @@ def build_client_context(
         site_url: The absolute SharePoint site URL (including url scheme).
         auth_config: Authentication configuration. If ``None``, default credential is used.
     """
-    if auth_config.strategy == Strategy.CLIENT_SECRET:
+    if auth_config.strategy != Strategy.CLIENT_CERTIFICATE:
         raise ValueError(
-            "ClientContext with CLIENT_SECRET strategy is not supported. "
-            "Use Certificate, Managed Identity, or Interactive Browser."
+            "ClientContext appears to only be working with CLIENT_CERTIFICATE strategy."
+            "Generate a new certificate for your app registration store it locally. "
+            "Provide the path to your authentication method."
         )
     cred: TokenCredential = get_credential(auth_config)
     scope = scopes.spo_scope_from_url(site_url)
