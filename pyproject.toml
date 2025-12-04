@@ -1,10 +1,10 @@
 [build-system]
-requires = ["setuptools >= 61.0"]
+requires = ["setuptools >= 61.0", "setuptools_scm[toml]>=6.2"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "msftoolbox"
-version = "0.2.0"
+dynamic = ["version"]
 description = "A python toolbox containing wrappers facilitating common operations."
 readme = "README.md"
 requires-python = ">=3.10"
@@ -21,7 +21,7 @@ dependencies = [
     "numpy",
     "pandas",
     "requests",
-    "azure-identity==1.12.0",
+    "azure-identity>=1.16.1",
     "azure-keyvault==4.2.0",
     "azure-keyvault-certificates==4.6.0",
     "azure-keyvault-keys==4.7.0",
@@ -47,6 +47,10 @@ dev = [
 # The value must be of the form "<package_name>:<module_name>.<function>"
 [project.scripts]
 
+[tool.setuptools_scm]
+write_to = "src/msftoolbox/_version.py"
+version_scheme = "post-release"
+local_scheme = "dirty-tag"
 
 [tool.pytest.ini_options]
 addopts = "-ra"

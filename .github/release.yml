@@ -1,0 +1,41 @@
+# .github/release.yml
+# Configuration for automatic release notes generation
+
+changelog:
+  exclude:
+    labels:
+      - ignore-for-release
+    authors:
+      - dependabot
+  categories:
+    - title: Features
+      labels:
+        - feature
+        - enhancement
+        - feat
+    - title: Bug Fixes
+      labels:
+        - bug
+        - bugfix
+        - fix
+    - title: Documentation
+      labels:
+        - documentation
+        - docs
+    - title: Maintenance
+      labels:
+        - chore
+        - maintenance
+        - refactor
+        - ci
+    - title: ⬆️ Dependencies
+      labels:
+        - dependencies
+        - deps
+    - title: Testing
+      labels:
+        - test
+        - tests
+    - title: Other Changes
+      labels:
+        - "*"

@@ -1,0 +1,212 @@
+name: Auto Version Bump
+
+on:
+  pull_request:
+    types: [closed]
+    branches: [ main ]
+
+jobs:
+  version-bump:
+    name: Create Release from Label
+    if: |
+      github.event.pull_request.merged == true &&
+      (contains(github.event.pull_request.labels.*.name, 'bump:patch') ||
+       contains(github.event.pull_request.labels.*.name, 'bump:minor') ||
+       contains(github.event.pull_request.labels.*.name, 'bump:major'))
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+        token: ${{ secrets.GITHUB_TOKEN }}
+    
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.10'
+    
+    - name: Install setuptools_scm
+      run: |
+        python -m pip install --upgrade pip
+        pip install setuptools_scm
+    
+    - name: Configure git
+      run: |
+        git config user.name "github-actions[bot]"
+        git config user.email "github-actions[bot]@users.noreply.github.com"
+    
+    - name: Determine version bump type
+      id: bump-type
+      run: |
+        if [[ "${{ contains(github.event.pull_request.labels.*.name, 'bump:major') }}" == "true" ]]; then
+          echo "type=major" >> $GITHUB_OUTPUT
+        elif [[ "${{ contains(github.event.pull_request.labels.*.name, 'bump:minor') }}" == "true" ]]; then
+          echo "type=minor" >> $GITHUB_OUTPUT
+        elif [[ "${{ contains(github.event.pull_request.labels.*.name, 'bump:patch') }}" == "true" ]]; then
+          echo "type=patch" >> $GITHUB_OUTPUT
+        fi
+    
+    - name: Get current version from git tags
+      id: current-version
+      run: |
+        # Get the latest tag, or use 0.0.0 if no tags exist
+        CURRENT_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
+        # Remove 'v' prefix if present
+        CURRENT_VERSION=${CURRENT_TAG#v}
+        echo "version=$CURRENT_VERSION" >> $GITHUB_OUTPUT
+        echo "Current version: $CURRENT_VERSION"
+    
+    - name: Calculate new version
+      id: new-version
+      run: |
+        CURRENT_VERSION="${{ steps.current-version.outputs.version }}"
+        BUMP_TYPE="${{ steps.bump-type.outputs.type }}"
+        
+        # Remove pre-release and build metadata (everything after - or +)
+        # This handles versions like 1.2.3-alpha, 1.2.3+build.1, 1.2.3-rc.1+build
+        BASE_VERSION=${CURRENT_VERSION%%[-+]*}
+        echo "Base version (without pre-release/build): $BASE_VERSION"
+        
+        # Split version into components
+        IFS='.' read -r -a VERSION_PARTS <<< "$BASE_VERSION"
+        
+        # Extract components with defaults to handle versions with fewer than 3 parts
+        # This handles cases like "1", "1.2", or "1.2.3"
+        MAJOR="${VERSION_PARTS[0]:-0}"
+        MINOR="${VERSION_PARTS[1]:-0}"
+        PATCH="${VERSION_PARTS[2]:-0}"
+        
+        # Validate that we have numeric values
+        if ! [[ "$MAJOR" =~ ^[0-9]+$ ]] || ! [[ "$MINOR" =~ ^[0-9]+$ ]] || ! [[ "$PATCH" =~ ^[0-9]+$ ]]; then
+          echo "ERROR: Invalid version format. Expected numeric values but got: $MAJOR.$MINOR.$PATCH"
+          exit 1
+        fi
+        
+        echo "Current version components: $MAJOR.$MINOR.$PATCH"
+        
+        # Increment based on bump type
+        case "$BUMP_TYPE" in
+          major)
+            MAJOR=$((MAJOR + 1))
+            MINOR=0
+            PATCH=0
+            ;;
+          minor)
+            MINOR=$((MINOR + 1))
+            PATCH=0
+            ;;
+          patch)
+            PATCH=$((PATCH + 1))
+            ;;
+        esac
+        
+        NEW_VERSION="${MAJOR}.${MINOR}.${PATCH}"
+        echo "new_version=$NEW_VERSION" >> $GITHUB_OUTPUT
+        echo "New version: $NEW_VERSION"
+    
+    - name: Create tag
+      run: |
+        git tag -a "v${{ steps.new-version.outputs.new_version }}" -m "Release v${{ steps.new-version.outputs.new_version }}"
+        git push origin "v${{ steps.new-version.outputs.new_version }}"
+    
+    - name: Generate changelog
+      id: changelog
+      run: |
+        # Function to extract PR title from merge commit message
+        # Handles various branch name formats and special characters
+        extract_pr_title() {
+          local commit_msg="$1"
+          # Match "Merge pull request #123 from owner/branch-name " and extract everything after
+          # The branch pattern handles: letters, numbers, -, _, ., / and other allowed GitHub branch chars
+          local pr_title=$(echo "$commit_msg" | sed -E 's/^Merge pull request #[0-9]+ from [^[:space:]]+ //')
+          
+          # Validate that we actually extracted something meaningful
+          if [ -n "$pr_title" ] && [ "$pr_title" != "$commit_msg" ]; then
+            echo "$pr_title"
+            return 0
+          else
+            return 1
+          fi
+        }
+        
+        # Get the newly created tag
+        NEW_TAG="v${{ steps.new-version.outputs.new_version }}"
+        
+        # Get the previous tag by finding the second most recent tag
+        # This works correctly even when HEAD is not yet tagged
+        PREVIOUS_TAG=$(git tag --sort=-version:refname | grep -v "^${NEW_TAG}$" | head -1 2>/dev/null || echo "")
+        
+        # If no previous tag exists (first release), PREVIOUS_TAG will be empty
+        if [ -n "$PREVIOUS_TAG" ]; then
+          echo "Found previous tag: $PREVIOUS_TAG"
+        else
+          echo "No previous tag found - this is the first release"
+        fi
+        
+        # Generate changelog content
+        echo "## What's Changed" > changelog.md
+        echo "" >> changelog.md
+        
+        if [ -z "$PREVIOUS_TAG" ]; then
+          # First release
+          echo "Initial release of MSF Toolbox" >> changelog.md
+          echo "" >> changelog.md
+          # List recent commits only (last 90 days) to avoid showing ancient history
+          MERGE_COMMITS=$(git log --since="90 days ago" --pretty=format:"%s" | grep -E "^Merge pull request #[0-9]+" | head -20)
+          if [ -z "$MERGE_COMMITS" ]; then
+            echo "- Initial project setup" >> changelog.md
+          else
+            while IFS= read -r line; do
+              if [ -n "$line" ]; then
+                if PR_TITLE=$(extract_pr_title "$line"); then
+                  echo "- $PR_TITLE" >> changelog.md
+                fi
+              fi
+            done <<< "$MERGE_COMMITS"
+          fi
+        else
+          # Get PR titles between tags - store output first to avoid subshell issues
+          MERGE_COMMITS=$(git log ${PREVIOUS_TAG}..${NEW_TAG} --pretty=format:"%s" | grep -E "^Merge pull request #[0-9]+")
+          while IFS= read -r line; do
+            if [ -n "$line" ]; then
+              if PR_TITLE=$(extract_pr_title "$line"); then
+                echo "- $PR_TITLE" >> changelog.md
+              fi
+            fi
+          done <<< "$MERGE_COMMITS"
+        fi
+        
+        echo "" >> changelog.md
+        echo "### Contributors" >> changelog.md
+        echo "" >> changelog.md
+        
+        if [ -z "$PREVIOUS_TAG" ]; then
+          # For first release, show contributors from last 90 days (consistent with commits)
+          (git log --since="90 days ago" --format="- @%an" | sort -u | grep -v "github-actions\[bot\]" || true) >> changelog.md
+        else
+          # Use NEW_TAG instead of HEAD to match the commit range
+          (git log ${PREVIOUS_TAG}..${NEW_TAG} --format="- @%an" | sort -u | grep -v "github-actions\[bot\]" || true) >> changelog.md
+        fi
+        
+        echo "" >> changelog.md
+        if [ ! -z "$PREVIOUS_TAG" ]; then
+          echo "**Full Changelog**: https://github.com/${{ github.repository }}/compare/${PREVIOUS_TAG}...${NEW_TAG}" >> changelog.md
+        fi
+        
+        # Output for next step
+        echo "changelog<<EOF" >> $GITHUB_OUTPUT
+        cat changelog.md >> $GITHUB_OUTPUT
+        echo "EOF" >> $GITHUB_OUTPUT
+    
+    - name: Create GitHub Release
+      uses: softprops/action-gh-release@v2
+      with:
+        tag_name: v${{ steps.new-version.outputs.new_version }}
+        name: Release v${{ steps.new-version.outputs.new_version }}
+        body: ${{ steps.changelog.outputs.changelog }}
+        draft: false
+        prerelease: false
