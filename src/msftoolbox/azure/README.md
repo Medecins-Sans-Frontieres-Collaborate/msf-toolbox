@@ -1,4 +1,161 @@
-------------------------------------
+# AzureKeyvaultClient
+
+## Overview
+
+`AzureKeyvaultClient` is a Python class designed to interact with the Azure KeyVault API. It provides methods for creating, reading, updating, and deleting KeyVault secrets and certificates.
+
+## Features
+
+- **Managing Secrets**: Fetch, upload, or delete secrets from a given keyvault url.
+- **Managing Certificates**: Fetch, import, download, or delete keyvault certificates from a given keyvault url.
+
+## Usage
+
+### Initialization
+
+The `AzureKeyvaultClient` class includes a `local_run` flag that can be set to `True` to enable interaction with Azure using a local credential; i.e. when set to `False` the client will be authenticated using the `managed_identity_client_id` instead.
+
+By default, `local_run` is set to `True` so the only argument that needs to be provided is the `keyvault_url`.
+
+```python
+from msftoolbox.azure.azure_keyvault import AzureKeyvaultClient
+
+client = AzureKeyvaultClient(
+    keyvault_url="your-keyvault-url",
+    local_run=True,
+    managed_identity_client_id=None,
+)
+```
+
+### Methods
+
+#### Get Keyvault Secret
+
+Fetch a secret value (str) from the KeyVault:
+
+```python
+secret = client.get_keyvault_secret_value(
+    secret_name="super-secret"
+    )
+```
+
+#### List Secrets
+
+List of all secret names in KeyVault:
+
+```python
+secrets = client.list_secret_names()
+```
+
+#### Create or Update Secret
+
+Create or update a secret in the KeyVault:
+
+```python
+kv_secret = client.set_keyvault_secret_value(
+    secret_name="super-secret",
+    secret_value="super-secret-value",
+    )
+```
+
+This method returns a KeyVaultSecret object with attributes `kv_secret.name` and `kv_secret.value`.
+
+#### Deleted Secrets
+
+Delete a secret from the KeyVault:
+
+```python
+deleted_secret = client.delete_keyvault_secret(
+    secret_name="super-secret"
+    )
+```
+
+Returns secret properties/attributes. If soft-delete is enabled, returns information about its recovery as well.
+
+List deleted secrets (only when vault has soft-delete enabled):
+
+```python
+deleted_secrets = client.list_deleted_keyvault_secrets()
+```
+
+Recover deleted secrets when soft-delete is enabled:
+
+```python
+kv_secret = client.recover_keyvault_secret(
+    secret_name="deleted-super-secret"
+    )
+```
+
+#### Get KeyVault Certificate
+
+Get a certificate object from KeyVault:
+
+```python
+kv_certificate = client.get_keyvault_certificate(
+    certificate_name="my-certificate"
+    )
+```
+
+The KeyVault certificate object has properties like `id`, `name`, and `policy`.
+
+#### List Certificate Names
+
+Lists all certificates in KeyVault:
+
+```python
+certificate_names = client.list_certificate_names()
+```
+
+#### Save KeyVault Certificate to .pem
+
+Saves a KeyVault certificate string to a local .pem file (will fail if string is in a different format):
+
+```python
+client.save_keyvault_certificate_to_pem(
+    certificate_name="my-certificate",
+    out_path="path/to/destination.pem",
+    )
+```
+
+#### Import KeyVault Certificate
+
+Import a certificate (CER, PFX, PEM) to the KeyVault:
+
+```python
+kv_certificate = client.import_keyvault_certificate_from_file(
+    certificate_name="my-certificate",
+    certificate_path="path/to/certificate.pem",
+    # Optional key-word arguments
+    password="secret-password",
+    enabled=True,
+    tags={"some-tag": "tag-value"},
+)
+```
+
+#### Deleted Certificates
+
+Delete a certificate in KeyVault:
+
+```python
+deleted_certificate = client.delete_keyvault_certificate(
+    certificate_name="my-certificate",
+)
+```
+
+List deleted certificates when soft-delete is enabled for the vault:
+
+```python
+deleted_certificates = client.list_deleted_keyvault_certificates()
+```
+
+Recover a deleted certificate when soft-delete is enabled:
+
+```python
+kv_certificate = client.recover_keyvault_certificate(
+    certificate_name="my-deleted-certificate",
+)
+```
+
 # AzureOpenAiClient
 
 ## Overview
@@ -104,7 +261,7 @@ embeddings, total_tokens = client.create_embedding(
 )
 ```
 
-#### Example Workflow
+## Example Workflow
 Chat Completion: Generate a response for user input.
 Structured Output: Parse the response into structured data.
 Embeddings: Convert text into embeddings for analysis.
@@ -277,11 +434,3 @@ client.upload_object_to_blob(
 ```
 
 This class provides a comprehensive interface for managing Azure Blob Storage operations, enabling efficient data handling and storage management.
-
-
---------------------
-
-# AzureStorageContainerClient
-To be done
-
---------------------
