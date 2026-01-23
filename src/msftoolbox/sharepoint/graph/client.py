@@ -214,68 +214,144 @@ class GraphFileClient:
         return drive_id, relative_path
 
     def list_files_in_folder(
-        self, folder_url: str, keep_metadata: bool = False
+        self,
+        folder_url: str,
+        select: str | None = None,
+        expand: str | None = None,
+        filter_: str | None = None,
+        orderby: str | None = None,
+        page_size: int | None = None,
+        **kwargs
     ) -> list[FileItem]:
         """
         Lists all files in a specified folder.
-
+        
         Args:
-            folder_url: The server-relative URL of the folder (/documentLibrary/Folder_Name/File_Name).
-            keep_metadata: If false returns only the name and server url, else the full properties object
-                is stored in extra.
+            folder_url: The server-relative URL of the folder.
+            select: Fields to select (e.g., "id,name,webUrl")
+            expand: Fields to expand (e.g., "listItem($expand=fields($select=Manufacturer_Name))")
+            filter_: OData filter (e.g., "lastModifiedDateTime gt 2026-01-01T00:00:00Z")
+            orderby: Order by clause (e.g., "lastModifiedDateTime desc")
+            page_size: Number of items per page (overrides default)
+            **kwargs: Additional OData parameters
+        
         Returns:
             A list of file records in the folder.
+        
+        Examples:
+            # Basic usage
+            files = client.list_files_in_folder("/Documents")
+            
+            # With specific fields
+            files = client.list_files_in_folder(
+                "/Documents",
+                select="id,name,webUrl",
+                expand="listItem($expand=fields($select=Manufacturer_Name,Article_Tag))"
+            )
+            
+            # With filtering and ordering
+            files = client.list_files_in_folder(
+                "/Documents",
+                filter_="lastModifiedDateTime gt 2026-01-01T00:00:00Z",
+                orderby="lastModifiedDateTime desc",
+                page_size=50
+            )
         """
-        # Server relative urls work differently in graph, and require that you still know
-        # the drive id of the library.
-
         # Construct Graph API URL
         drive_id, relative_path = self.parse_server_relative_url(folder_url)
         path_segment = f":/{relative_path}:" if relative_path else ""
         url = f"https://graph.microsoft.com/v1.0/drives/{drive_id}/root{path_segment}/children"
-
+        
         items: list[FileItem] = []
-        for item in self._paged_fetch(url):
+        for item in self._paged_fetch(
+            url,
+            select=select,
+            expand=expand,
+            filter_=filter_,
+            orderby=orderby,
+            top=page_size,
+            **kwargs
+        ):
             if "file" in item:
-                item: FileItem = self._map_file_properties(item)
-                items.append(item)
+                file_item: FileItem = self._map_file_properties(item)
+                items.append(file_item)
+        
         if not items:
-            logger.info("No files were found in folder %s.", folder_url.split["/"][-1])
+            folder_name = folder_url.split("/")[-1] if "/" in folder_url else folder_url
+            logger.info("No files were found in folder %s.", folder_name)
+        
         return items
 
     def list_folders_in_folder(
-        self, folder_url: str, keep_metadata: bool = False
-    ) -> list[FileItem]:
+        self,
+        folder_url: str,
+        select: str | None = None,
+        expand: str | None = None,
+        filter_: str | None = None,
+        orderby: str | None = None,
+        page_size: int | None = None,
+        **kwargs
+    ) -> list[FolderItem]:
         """
-        Lists all files in a specified folder.
-
+        Lists all folders in a specified folder.
+        
         Args:
             folder_url: The server-relative URL of the folder.
-            keep_metadata: If false returns only the name and server url, else the full properties object
-                is stored in extra.
-
+            keep_metadata: If False, returns only name and server URL; 
+                        if True, stores full properties in extra.
+            select: Fields to select (e.g., "id,name,webUrl")
+            expand: Fields to expand (e.g., "listItem($expand=fields($select=CustomColumn))")
+            filter_: OData filter (e.g., "name eq 'Archive'")
+            orderby: Order by clause (e.g., "name asc")
+            page_size: Number of items per page (overrides default)
+            **kwargs: Additional OData parameters
+        
         Returns:
             A list of folder records in the folder.
+        
+        Examples:
+            # Basic usage
+            folders = client.list_folders_in_folder("/Documents")
+            
+            # With specific fields
+            folders = client.list_folders_in_folder(
+                "/Documents",
+                select="id,name,webUrl",
+                expand="listItem($expand=fields($select=CustomColumn))"
+            )
+            
+            # With filtering and ordering
+            folders = client.list_folders_in_folder(
+                "/Documents",
+                filter_="name ne 'Archive'",
+                orderby="name asc",
+                page_size=50
+            )
         """
-        # Server relative urls work differently in graph, and require that you still know
-        # the drive id of the library.
-
         # Construct Graph API URL
         drive_id, relative_path = self.parse_server_relative_url(folder_url)
         path_segment = f":/{relative_path}:" if relative_path else ""
         url = f"https://graph.microsoft.com/v1.0/drives/{drive_id}/root{path_segment}/children"
-
+        
         items: list[FolderItem] = []
-        for item in self._paged_fetch(url):
+        for item in self._paged_fetch(
+            url,
+            select=select,
+            expand=expand,
+            filter_=filter_,
+            orderby=orderby,
+            top=page_size,
+            **kwargs
+        ):
             if "folder" in item:
-                item: FolderItem = self._map_folder_properties(item)
-                items.append(item)
+                folder_item: FolderItem = self._map_folder_properties(item)
+                items.append(folder_item)
+        
         if not items:
-            logger.info(
-                "No folders were found in folder %s.", folder_url.split["/"][-1]
-            )
+            folder_name = folder_url.split("/")[-1] if "/" in folder_url else folder_url
+            logger.info("No folders were found in folder %s.", folder_name)
+        
         return items
-
     def download_file(self, source_url: str, destination_file_path: str) -> None:
         """
         Downloads a file from SharePoint.
