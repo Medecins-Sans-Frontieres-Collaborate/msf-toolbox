@@ -28,7 +28,6 @@ class GraphFileClient:
         """
         self._headers = {}
         self.select: str = None
-        self.page_size: int = 500
 
         self._auth = auth
         self.graph_client, self._token_credential = build_graph_client(self._auth)
@@ -44,9 +43,53 @@ class GraphFileClient:
         """Return a new access token."""
         return self._token_credential.get_token(scopes.GRAPH_DEFAULT_SCOPE)
 
-    def _build_request_params(self):
-        query_params = f"?{'$select=' + self.select + '&' if self.select else ''}$top={self.page_size}"
-        return query_params
+    def _build_request_params(
+        self,
+        select: str | None = None,
+        expand: str | None = None,
+        filter_: str | None = None,
+        orderby: str | None = None,
+        top: int | None = 500,
+        **kwargs
+    ) -> str:
+        """
+        Build OData query parameters for Graph API requests.
+        
+        Args:
+            select: Fields to select (e.g., "id,name,webUrl")
+            expand: Fields to expand (e.g., "listItem($expand=fields($select=Manufacturer_Name))")
+            filter_: OData filter expression (e.g., "lastModifiedDateTime gt 2026-01-01T00:00:00Z")
+            orderby: Fields to order by (e.g., "lastModifiedDateTime desc")
+            top: Number of items per page
+            **kwargs: Additional OData parameters (e.g., skip=10, count=True)
+        
+        Returns:
+            Query string with parameters
+        """
+        params = []
+        
+        if select:
+            params.append(f"$select={select}")
+        
+        if expand:
+            params.append(f"$expand={expand}")
+        
+        if filter_:
+            params.append(f"$filter={filter_}")
+        
+        if orderby:
+            params.append(f"$orderby={orderby}")
+        
+        if top is not None:
+            params.append(f"$top={top}")
+        
+        # Handle additional OData parameters
+        for key, value in kwargs.items():
+            # Convert Python naming to OData (e.g., skip -> $skip)
+            odata_key = f"${key}" if not key.startswith('$') else key
+            params.append(f"{odata_key}={value}")
+        
+        return f"?{'&'.join(params)}" if params else ""
 
     def _paged_fetch(self, request_url):
         def _fetch(initial: bool, next_link: str | None = None):
