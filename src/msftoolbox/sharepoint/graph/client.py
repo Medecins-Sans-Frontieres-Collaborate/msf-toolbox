@@ -153,7 +153,8 @@ class GraphFileClient:
 
         # Construct Graph API URL
         drive_id, relative_path = self.parse_server_relative_url(folder_url)
-        url = f"https://graph.microsoft.com/v1.0/drives/{drive_id}/root:/{relative_path}:/children"
+        path_segment = f":/{relative_path}:" if relative_path else ""
+        url = f"https://graph.microsoft.com/v1.0/drives/{drive_id}/root{path_segment}/children"
 
         items: list[FileItem] = []
         for item in self._paged_fetch(url):
@@ -183,7 +184,8 @@ class GraphFileClient:
 
         # Construct Graph API URL
         drive_id, relative_path = self.parse_server_relative_url(folder_url)
-        url = f"https://graph.microsoft.com/v1.0/drives/{drive_id}/root:/{relative_path}:/children"
+        path_segment = f":/{relative_path}:" if relative_path else ""
+        url = f"https://graph.microsoft.com/v1.0/drives/{drive_id}/root{path_segment}/children"
 
         items: list[FolderItem] = []
         for item in self._paged_fetch(url):
