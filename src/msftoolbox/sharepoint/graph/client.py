@@ -28,6 +28,7 @@ class GraphFileClient:
         """
         self._headers = {}
         self.select: str = None
+        self.page_size: int = 500
 
         self._auth = auth
         self.graph_client, self._token_credential = build_graph_client(self._auth)
@@ -49,7 +50,7 @@ class GraphFileClient:
         expand: str | None = None,
         filter_: str | None = None,
         orderby: str | None = None,
-        top: int | None = 500,
+        top: int | None = None,
         **kwargs
     ) -> str:
         """
@@ -91,31 +92,65 @@ class GraphFileClient:
         
         return f"?{'&'.join(params)}" if params else ""
 
-    def _paged_fetch(self, request_url):
-        def _fetch(initial: bool, next_link: str | None = None):
-            url = request_url + self._build_request_params()
+def _paged_fetch(
+    self,
+    request_url: str,
+    select: str | None = None,
+    expand: str | None = None,
+    filter_: str | None = None,
+    orderby: str | None = None,
+    top: int | None = None,
+    **kwargs
+):
+    """
+    Fetch paginated results from Graph API.
+    
+    Args:
+        request_url: Base URL for the request
+        select: Fields to select
+        expand: Fields to expand
+        filter_: OData filter expression
+        orderby: Fields to order by
+        top: Number of items per page
+        **kwargs: Additional OData parameters
+    
+    Yields:
+        Individual items from paginated response
+    """
+    def _fetch(initial: bool, next_link: str | None = None):
+        if not initial and next_link:
+            # nextLink already contains all query params
+            response = requests.get(next_link, headers=self._headers)
+        else:
+            # Build URL with query params for initial request
+            query_params = self._build_request_params(
+                select=select,
+                expand=expand,
+                filter_=filter_,
+                orderby=orderby,
+                top=top or self.page_size,
+                **kwargs
+            )
+            url = request_url + query_params
+            response = requests.get(url, headers=self._headers)
+        
+        response.raise_for_status()
+        return response.json()
+    
+    page = _fetch(initial=True)
+    
+    while True:
+        next_link: str | None = page.get("@odata.nextLink", None)
+        
+        for item in page.get("value", []):
+            yield item
+        
+        if not next_link:
+            break
+        
+        logger.debug("Fetching next page via @odata.nextLink")
+        page = _fetch(initial=False, next_link=next_link)
 
-            if not initial and next_link:
-                response = requests.get(next_link, headers=self._headers)
-            else:
-                response = requests.get(url, headers=self._headers)
-
-            response.raise_for_status()
-            return response.json()
-
-        page = _fetch(initial=True)
-
-        while True:
-            next_link: str | None = page.get("@odata.nextLink", None)
-
-            for item in page.get("value"):
-                yield item
-
-            if not next_link:
-                break
-
-            logger.debug("Fetching next page via @odata.nextLink")
-            page = _fetch(initial=False, next_link=next_link)
 
     @staticmethod
     def _map_file_properties(sp_file, keep_metadata: bool = True) -> FileItem:
