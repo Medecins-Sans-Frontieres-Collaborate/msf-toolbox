@@ -272,7 +272,7 @@ class GraphFileClient:
             top=page_size,
             **kwargs
         ):
-            if "file" in item:
+            if "file" in item or "listItem" in item:
                 file_item: FileItem = self._map_file_properties(item)
                 items.append(file_item)
         
