@@ -216,6 +216,7 @@ class GraphFileClient:
     def list_files_in_folder(
         self,
         folder_url: str,
+        keep_metadata: bool = False,
         select: str | None = None,
         expand: str | None = None,
         filter_: str | None = None,
@@ -285,6 +286,7 @@ class GraphFileClient:
     def list_folders_in_folder(
         self,
         folder_url: str,
+        keep_metadata: bool = False,
         select: str | None = None,
         expand: str | None = None,
         filter_: str | None = None,
