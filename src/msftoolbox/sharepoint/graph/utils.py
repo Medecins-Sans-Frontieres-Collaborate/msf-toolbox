@@ -18,4 +18,5 @@ def convert_sharepoint_url(url: str) -> str:
 
 def get_encoded_relative_path(server_relative_url: str) -> str:
     # The relative path must be encoded for special characters
-    return urllib.parse.quote(server_relative_url.strip("/").split("/", 1)[1])
+    drive_relative_url = server_relative_url.strip("/").split("/", 1)
+    return urllib.parse.quote(drive_relative_url[1]) if len(drive_relative_url) > 1 else ""
