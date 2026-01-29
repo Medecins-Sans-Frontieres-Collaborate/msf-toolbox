@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "msftoolbox"
-version = "0.2.0"
+version = "0.3.0"
 description = "A python toolbox containing wrappers facilitating common operations."
 readme = "README.md"
 requires-python = ">=3.10"
