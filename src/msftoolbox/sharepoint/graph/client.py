@@ -2,7 +2,8 @@ from __future__ import annotations
 
 import logging
 import urllib.parse
-
+import time
+import random
 import requests
 from azure.core.credentials import AccessToken
 
@@ -91,6 +92,36 @@ class GraphFileClient:
             params.append(f"{odata_key}={value}")
         
         return f"?{'&'.join(params)}" if params else ""
+    
+    def _fetch_with_retry(self, url: str, headers: dict):
+        RETRY_STATUS_CODES = {429, 503, 504}
+        MAX_RETRIES = 5
+        BASE_DELAY = 1.0
+        for attempt in range(1, MAX_RETRIES + 1):
+            response = requests.get(url, headers=headers)
+            if response.status_code < 400:
+                return response.json()
+            if response.status_code not in RETRY_STATUS_CODES:
+                response.raise_for_status()
+            # Retry logic
+            retry_after = response.headers.get("Retry-After")
+
+            if retry_after:
+                delay = int(retry_after)
+            else:
+                delay = BASE_DELAY * (2 ** (attempt - 1))
+                delay += random.uniform(0, 0.5)  # jitter
+            if attempt == MAX_RETRIES:
+                response.raise_for_status()
+            logger.warning(
+                "Graph API %s error. Retrying in %.1f seconds (attempt %d/%d)",
+                response.status_code,
+                delay,
+                attempt,
+                MAX_RETRIES,
+            )
+            time.sleep(delay)
+        raise RuntimeError("Unreachable")
 
     def _paged_fetch(
         self,
@@ -120,7 +151,7 @@ class GraphFileClient:
         def _fetch(initial: bool, next_link: str | None = None):
             if not initial and next_link:
                 # nextLink already contains all query params
-                response = requests.get(next_link, headers=self._headers)
+                return self._fetch_with_retry(next_link, self._headers)
             else:
                 # Build URL with query params for initial request
                 query_params = self._build_request_params(
@@ -132,12 +163,17 @@ class GraphFileClient:
                     **kwargs
                 )
                 url = request_url + query_params
-                response = requests.get(url, headers=self._headers)
+                return self._fetch_with_retry(url, self._headers)
             
-            response.raise_for_status()
-            return response.json()
-        
-        page = _fetch(initial=True)
+        # Run first page 
+        is_initial=True        
+        page = _fetch(initial=is_initial)
+
+        # Add log for first page
+        if is_initial:
+            page_number = 1
+            logger.info("Fetched page %s", page_number)
+            is_initial=False
         
         while True:
             next_link: str | None = page.get("@odata.nextLink", None)
@@ -149,7 +185,9 @@ class GraphFileClient:
                 break
             
             logger.debug("Fetching next page via @odata.nextLink")
-            page = _fetch(initial=False, next_link=next_link)
+            page = _fetch(initial=is_initial, next_link=next_link)
+            page_number += 1
+            logger.info("Fetched page %s", page_number)
 
 
     @staticmethod
@@ -229,7 +267,7 @@ class GraphFileClient:
         
         Args:
             folder_url: The server-relative URL of the folder.
-            select: Fields to select (e.g., "id,name,webUrl")
+            select: Fields to select (e.g., "id,name,webUrl,file"). WARNING: If using select, make sure to include the file field.
             expand: Fields to expand (e.g., "listItem($expand=fields($select=Manufacturer_Name))")
             filter_: OData filter (e.g., "lastModifiedDateTime gt 2026-01-01T00:00:00Z")
             orderby: Order by clause (e.g., "lastModifiedDateTime desc")
