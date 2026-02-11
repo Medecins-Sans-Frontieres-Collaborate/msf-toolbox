@@ -166,15 +166,8 @@ class GraphFileClient:
                 return self._fetch_with_retry(url, self._headers)
             
         # Run first page 
-        is_initial=True        
-        page = _fetch(initial=is_initial)
-
-        # Add log for first page
-        if is_initial:
-            page_number = 1
-            logger.info("Fetched page %s", page_number)
-            is_initial=False
-        
+        page = _fetch(initial=True)
+        page_number = 1
         while True:
             next_link: str | None = page.get("@odata.nextLink", None)
             
@@ -184,10 +177,13 @@ class GraphFileClient:
             if not next_link:
                 break
             
+            if page_number == 1:
+                logger.info("Processed page %s. Starting looping mechanism.", page_number)
+
             logger.debug("Fetching next page via @odata.nextLink")
-            page = _fetch(initial=is_initial, next_link=next_link)
             page_number += 1
-            logger.info("Fetched page %s", page_number)
+            page = _fetch(initial=False, next_link=next_link)
+            logger.info("Processed page %s.", page_number)
 
     def get_item(
         self,
