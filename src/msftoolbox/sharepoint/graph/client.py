@@ -189,6 +189,53 @@ class GraphFileClient:
             page_number += 1
             logger.info("Fetched page %s", page_number)
 
+    def get_item(
+        self,
+        item_url: str,
+        *,
+        keep_metadata: bool = True,
+        select: str | None = None,
+        expand: str | None = None,
+    ) -> FileItem | FolderItem | None:
+        """
+        Fetch a single file or folder by server-relative URL.
+
+        Args:
+            item_url: Server-relative URL of the file or folder
+            keep_metadata: Store full metadata in `extra`
+            select: Fields to select (e.g. "id,name,webUrl,file,folder")
+            expand: Fields to expand (e.g. "listItem($expand=fields($select=Manufacturer_Name))")
+
+        Returns:
+            FileItem or FolderItem, or None if not found
+        """
+        drive_id, relative_path = self.parse_server_relative_url(item_url)
+
+        query_params = self._build_request_params(
+            select=select,
+            expand=expand,
+        )
+
+        url = (
+            f"https://graph.microsoft.com/v1.0/drives/{drive_id}"
+            f"/root:/{relative_path}{query_params}"
+        )
+
+        try:
+            item = self._fetch_with_retry(url, self._headers)
+        except requests.exceptions.HTTPError as exc:
+            if exc.response.status_code == 404:
+                logger.info("Item not found: %s", item_url)
+                return None
+            raise
+
+        if "file" in item:
+            return self._map_file_properties(item, keep_metadata)
+        if "folder" in item:
+            return self._map_folder_properties(item, keep_metadata)
+
+        logger.warning("Unknown item type for %s", item_url)
+        return None
 
     @staticmethod
     def _map_file_properties(sp_file, keep_metadata: bool = True) -> FileItem:
