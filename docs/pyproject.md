@@ -1,9 +1,14 @@
-# pypyroject.toml
+# pyproject.toml
 
-The pyproject.toml is the main configuration file used for the Python project.
-It contains configurations for building, linting, testing, and publishing the Python package.
+The `pyproject.toml` is the main configuration file for this project. Poetry
+defines the package metadata and dependencies there, and `poetry.lock` records
+the exact resolved versions.
 
-The pyproject.toml replaces the "setup.py" package. When using 'flit' or 'poetry', only the pyproject.toml is required.
-This project currently uses 'flit', but in the future may also include a 'poetry' example. Both are considered viable options.
+Install the project and its development dependencies with:
 
-When using setuptools, and setup.cfg is still required.
+    poetry install --with dev
+
+Run commands in Poetry's environment, for example:
+
+    poetry run pytest
+    poetry run pylint src/msftoolbox
