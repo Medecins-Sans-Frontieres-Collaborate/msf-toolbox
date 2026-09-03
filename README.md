@@ -49,8 +49,11 @@ The toolbox is designed to simplify the interaction with multiple services, prov
 - **Installation**:
 
 ```bash
-pip install git+https://github.com/MSF-Collaborate/msf-toolbox.git
+poetry add git+https://github.com/MSF-Collaborate/msf-toolbox.git
 ```
+
+For local development, install Poetry and run `poetry install --with dev`.
+Use `poetry run pytest` to run the test suite.
 
 ## Reporting Issues and Requests
 

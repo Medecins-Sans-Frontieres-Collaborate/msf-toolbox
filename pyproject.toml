@@ -1,28 +1,28 @@
 [build-system]
-requires = ["setuptools >= 61.0"]
-build-backend = "setuptools.build_meta"
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"
 
 [project]
 name = "msftoolbox"
 version = "0.3.0"
 description = "A python toolbox containing wrappers facilitating common operations."
 readme = "README.md"
-requires-python = ">=3.10"
+license = "MIT"
+requires-python = ">=3.10,<4.0"
 
 # Metadata about your package in case you upload it to PYPI
 classifiers = [
     "Programming Language :: Python :: 3",
-    "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
 ]
 
-# All the dependencies needed for running your module go here
+# All the dependencies needed for running your module go here.
 dependencies = [
     "numpy",
     "pandas",
     "requests",
     "pydantic",
-    "pydantic_settings",
+    "pydantic-settings",
     "azure-identity",
     "azure-keyvault==4.2.0",
     "azure-keyvault-certificates==4.10.0",
@@ -33,27 +33,23 @@ dependencies = [
     "azure-mgmt-resource==24.0.0",
     "openai==2.16.0",
     "msgraph-sdk==1.53.0",
-    "Office365-REST-Python-Client==2.6.2",
+    "office365-rest-python-client==2.6.2",
     "newspaper3k==0.2.8",
-    "lxml_html_clean",
-    "SQLAlchemy==2.0.46",
-    "pyodbc==5.2.0"
+    "lxml-html-clean",
+    "sqlalchemy==2.0.46",
+    "pyodbc==5.2.0",
 ]
 
-[project.optional-dependencies]
-dev = [
-    "pytest",
-    "pytest-mock",
-    "pytest-cov",
-    "hypothesis",
-    "pylint",
-    "ruff",
-]
+[tool.poetry]
+packages = [{ include = "msftoolbox", from = "src" }]
 
-# If your project contains scripts you'd like to be available command line, you can define them here.
-# The value must be of the form "<package_name>:<module_name>.<function>"
-[project.scripts]
-
+[tool.poetry.group.dev.dependencies]
+pytest = "*"
+pytest-mock = "*"
+pytest-cov = "*"
+hypothesis = "*"
+pylint = "*"
+ruff = "*"
 
 [tool.pytest.ini_options]
 addopts = "-ra"
