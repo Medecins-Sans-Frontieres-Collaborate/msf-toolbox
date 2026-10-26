@@ -4,11 +4,11 @@ build-backend = "poetry.core.masonry.api"
 
 [project]
 name = "msftoolbox"
-version = "0.3.0"
+version = "0.4.0"
 description = "A python toolbox containing wrappers facilitating common operations."
 readme = "README.md"
 license = "MIT"
-requires-python = ">=3.10,<4.0"
+requires-python = ">=3.11,<4.0"
 
 # Metadata about your package in case you upload it to PYPI
 classifiers = [
@@ -24,20 +24,21 @@ dependencies = [
     "pydantic",
     "pydantic-settings",
     "azure-identity",
-    "azure-keyvault==4.2.0",
-    "azure-keyvault-certificates==4.10.0",
-    "azure-keyvault-keys==4.11.0",
-    "azure-keyvault-secrets==4.10.0",
-    "azure-storage-blob==12.28.0",
-    "azure-mgmt-core==1.6.0",
-    "azure-mgmt-resource==24.0.0",
-    "openai==2.16.0",
-    "msgraph-sdk==1.53.0",
-    "office365-rest-python-client==2.6.2",
-    "newspaper3k==0.2.8",
+    "azure-keyvault>=4.2.0",
+    "azure-keyvault-certificates>=4.10.0",
+    "azure-keyvault-keys>=4.11.0",
+    "azure-keyvault-secrets>=4.10.0",
+    "azure-storage-blob>=12.28.0",
+    "azure-mgmt-core>=1.6.0",
+    "azure-mgmt-resource>=24.0.0",
+    "openai>=2.16.0",
+    "msgraph-sdk>=1.53.0",
+    "office365-rest-python-client>=2.6.2",
+    "newspaper3k>=0.2.8",
+    "pillow>=13.0.0",
     "lxml-html-clean",
-    "sqlalchemy==2.0.46",
-    "pyodbc==5.2.0",
+    "sqlalchemy>=2.0.46",
+    "pyodbc>=5.2.0",
 ]
 
 [tool.poetry]
